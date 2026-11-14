@@ -100,3 +100,37 @@
 .settings-actions button{padding:9px 13px;border-radius:7px;border:1px solid #3a4657}
 .settings-actions .primary{background:#237be5;border-color:#237be5;color:white}
 @media(max-width:600px){.quality-table-head,.quality-table-row{grid-template-columns:1fr .8fr .8fr;gap:6px}.quality-table-row{font-size:10px}.settings-actions{flex-wrap:wrap}}
+
+/* v1.8 layout: file details beside filename, copy count in each filmstrip card */
+.editor-toolbar{gap:12px}
+.photo-title-group{display:flex;align-items:center;gap:14px;min-width:0;flex:1;flex-wrap:wrap}
+.photo-name{max-width:min(260px,28vw);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.toolbar-metrics{gap:9px;font-size:10px;min-width:0}
+.toolbar-metrics .quality-indicator{padding:3px 6px}
+.editor-footer .orientation-control{flex:none}
+.editor-footer .footer-actions{margin-left:auto}
+.format-select select:disabled,.custom-format input:disabled{opacity:.38;cursor:not-allowed;background:#151b24;color:#778396;border-color:#2d3643}
+.thumb-card{flex:0 0 180px;width:180px;min-width:0;display:flex;flex-direction:column;gap:5px;padding:3px 4px 6px;border:1px solid transparent;border-radius:9px}
+.thumb-card.active{border-color:#318cff;background:#1b293b}
+.thumb-select{display:flex;flex-direction:column;align-items:stretch;gap:5px;min-width:0;padding:0;border:0;background:transparent;text-align:left}
+.thumb-select .thumb-image{height:104px;width:100%;flex:none}
+.thumb-select .thumb-label{display:block;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;font-size:10px;color:#c1ccda;padding:0 3px}
+.thumb-copies{display:flex;align-items:center;justify-content:center;gap:12px;height:25px;border-top:1px solid #303b49;padding-top:4px}
+.thumb-copies button{width:25px;height:22px;border:1px solid #3b4859;border-radius:5px;background:#222d3b;color:#dce7f5;font-size:16px;line-height:1;padding:0}
+.thumb-copies button:disabled{opacity:.3;cursor:not-allowed}
+.thumb-copies b{min-width:18px;text-align:center;font-size:11px;color:#f0f4fa}
+.print-sheet.mode-free{background:transparent;overflow:visible;box-shadow:0 0 0 9999px rgba(5,9,15,.66),0 12px 42px #0008;cursor:grab}
+.print-sheet.mode-free:active{cursor:grabbing}
+.print-sheet.mode-free .stage-photo{z-index:1}
+.print-sheet.mode-free .crop-shade{z-index:2}
+.free-resize-handle{position:absolute;z-index:6;right:-8px;bottom:-8px;width:17px;height:17px;border:2px solid #fff;border-radius:50%;background:#318cff;box-shadow:0 1px 8px #0009;cursor:nwse-resize;touch-action:none;padding:0}
+@media(max-width:1100px){.thumb-card{flex-basis:150px;width:150px}.toolbar-metrics{gap:6px}}
+@media(max-width:760px){
+  .editor-toolbar{height:auto;min-height:54px;flex-wrap:wrap;padding:8px}
+  .photo-title-group{width:100%;gap:7px}
+  .photo-name{max-width:100%;width:100%}
+  .toolbar-metrics{width:100%;flex-wrap:wrap}
+  .editor-nav{margin-left:auto}
+  .thumb-card{flex-basis:125px;width:125px}
+  .thumb-select .thumb-image{height:78px}
+}

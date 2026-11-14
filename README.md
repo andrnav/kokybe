@@ -60,3 +60,12 @@ Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe
 - Added editable quality thresholds in the settings dialog. Values are saved in browser local storage.
 - Quality thresholds are interpolated by the print's longest side. The rating uses the lower of horizontal and vertical effective source DPI.
 - Real Size output remains 320 DPI, while its quality rating uses the original source crop resolution before upscaling.
+
+
+## v1.8 – laisvas kadravimas ir nuotraukų eilės patobulinimai
+
+- „Laisvas“ režimas naudoja nepriklausomą apkirpimo stačiakampį, kuris pradžioje apima visą originalią nuotrauką.
+- Laisvo kadro proporcija nepririšta prie spausdinimo formato. Stačiakampį galima keisti tempiant jo apatinį dešinį kampą, o nuotrauką – stumdyti kadro viduje.
+- Spausdinimo formato pasirinkimas ir rankiniai matmenys išjungiami „Laisvas“ režime. Kiti režimai vėl naudoja pasirinktą formatą.
+- Pikseliai, DPI ir kokybės įvertinimas perkeltas šalia failo pavadinimo.
+- Kopijų kiekio valdiklis perkeltas į kiekvienos nuotraukos kortelę apačioje, po miniatiūra ir failo pavadinimu.
