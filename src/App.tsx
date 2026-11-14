@@ -1,6 +1,6 @@
 import type React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap, Crop, Calculator, Sparkles, Download, RotateCcw, Layers, Images } from 'lucide-react'
+import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap, Crop, Calculator, Sparkles, Download, RotateCcw, Layers, Images, ZoomIn, ZoomOut, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Mode, Profile } from './analysis'
 import { printGrade, qualityWord, runIqa } from './analysis'
 
@@ -44,7 +44,7 @@ function encodeTiff(canvas:HTMLCanvasElement):Blob{
   view.setUint32(o,0,true);view.setUint16(bitsOffset,8,true);view.setUint16(bitsOffset+2,8,true);view.setUint16(bitsOffset+4,8,true);bytes.set(pixels,pixelOffset)
   return new Blob([buffer],{type:'image/tiff'})
 }
-const BATCH_FORMATS=[{label:'9 × 13 cm (vertikalus)',w:9,h:13},{label:'13 × 9 cm (horizontalus)',w:13,h:9},{label:'10 × 15 cm (vertikalus)',w:10,h:15},{label:'15 × 10 cm (horizontalus)',w:15,h:10},{label:'15 × 15 cm (kvadratas)',w:15,h:15},{label:'20 × 30 cm (vertikalus)',w:20,h:30},{label:'30 × 20 cm (horizontalus)',w:30,h:20}]
+const BATCH_FORMATS=[{label:'9 × 13 cm',w:9,h:13},{label:'10 × 15 cm',w:10,h:15},{label:'15 × 15 cm',w:15,h:15},{label:'20 × 30 cm',w:20,h:30}]
 function BatchProcessor(){
   const [items,setItems]=useState<BatchItem[]>([])
   const [output,setOutput]=useState<BatchOutput>('jpg')
@@ -52,11 +52,20 @@ function BatchProcessor(){
   const [busy,setBusy]=useState(false)
   const [message,setMessage]=useState('')
   const [selected,setSelected]=useState<string|null>(null)
+  const [formatIndex,setFormatIndex]=useState(1)
+  const [orientation,setOrientation]=useState<'portrait'|'landscape'>('portrait')
   const input=useRef<HTMLInputElement>(null)
+  const drag=useRef<{x:number;y:number;panX:number;panY:number}|null>(null)
   const update=(id:string,patch:Partial<BatchItem>)=>setItems(prev=>prev.map(i=>i.id===id?{...i,...patch,status:'waiting',output:undefined,outputName:undefined}:i))
   const addFiles=(files:FileList|null)=>{if(!files)return;const accepted=Array.from(files).filter(f=>f.type.startsWith('image/')||/\.(heic|heif|tif|tiff|bmp|avif|gif)$/i.test(f.name));const added=accepted.map(file=>({id:`${file.name}-${file.size}-${Math.random()}`,file,previewUrl:URL.createObjectURL(file),status:'waiting' as const,format:'10x15',mode:'ratio' as BatchCropMode,ratio:2/3,exactW:15.2,exactH:10.2,dpi:300,panX:0,panY:0,zoom:1,copies:1}));setItems(prev=>[...prev,...added]);if(!selected&&added[0])setSelected(added[0].id);setMessage('')}
   const selectedItem=items.find(i=>i.id===selected)
-  const formatFor=(item:BatchItem)=>BATCH_FORMATS.find(f=>`${f.w}x${f.h}`===item.format)||BATCH_FORMATS[1]
+  const baseFormat=BATCH_FORMATS[formatIndex]||BATCH_FORMATS[1]
+  const targetW=orientation==='portrait'?baseFormat.w:baseFormat.h
+  const targetH=orientation==='portrait'?baseFormat.h:baseFormat.w
+  const targetRatio=targetW/targetH
+  const onCropPointerDown=(e:React.PointerEvent<HTMLDivElement>)=>{if(!selectedItem)return;e.currentTarget.setPointerCapture(e.pointerId);drag.current={x:e.clientX,y:e.clientY,panX:selectedItem.panX,panY:selectedItem.panY}}
+  const onCropPointerMove=(e:React.PointerEvent<HTMLDivElement>)=>{if(!drag.current||!selectedItem)return;const r=e.currentTarget.getBoundingClientRect();const dx=(e.clientX-drag.current.x)/Math.max(1,r.width)*200;const dy=(e.clientY-drag.current.y)/Math.max(1,r.height)*200;update(selectedItem.id,{panX:Math.max(-100,Math.min(100,drag.current.panX+dx)),panY:Math.max(-100,Math.min(100,drag.current.panY+dy))})}
+  const onCropPointerUp=()=>{drag.current=null}
   async function processAll(){
     if(!items.length||busy)return
     setBusy(true);setMessage('Apdorojamos nuotraukos...')
@@ -65,20 +74,20 @@ function BatchProcessor(){
       const item=next[i]
       try{
         const img=await decodeBatchFile(item.file)
-        const f=formatFor(item), targetW=item.mode==='exact'?item.exactW:f.w, targetH=item.mode==='exact'?item.exactH:f.h
-        const targetRatio=targetW/targetH, sourceRatio=img.naturalWidth/img.naturalHeight
+        const tw=item.mode==='exact'?item.exactW:targetW, th=item.mode==='exact'?item.exactH:targetH
+        const ratio=tw/th, sourceRatio=img.naturalWidth/img.naturalHeight
         let sx=0,sy=0,sw=img.naturalWidth,sh=img.naturalHeight
         let outW=img.naturalWidth,outH=img.naturalHeight
         if(item.mode==='fit'){
-          if(sourceRatio>targetRatio){outW=Math.max(1,Math.round(img.naturalWidth));outH=Math.max(1,Math.round(outW/targetRatio))}
-          else{outH=Math.max(1,Math.round(img.naturalHeight));outW=Math.max(1,Math.round(outH*targetRatio))}
+          if(sourceRatio>ratio){outW=Math.max(1,Math.round(img.naturalWidth));outH=Math.max(1,Math.round(outW/ratio))}
+          else{outH=Math.max(1,Math.round(img.naturalHeight));outW=Math.max(1,Math.round(outH*ratio))}
         }else{
-          if(sourceRatio>targetRatio){sw=img.naturalHeight*targetRatio;sh=img.naturalHeight}else{sh=img.naturalWidth/targetRatio;sw=img.naturalWidth}
+          if(sourceRatio>ratio){sw=img.naturalHeight*ratio;sh=img.naturalHeight}else{sh=img.naturalWidth/ratio;sw=img.naturalWidth}
           sw/=item.zoom;sh/=item.zoom
           const maxX=Math.max(0,img.naturalWidth-sw),maxY=Math.max(0,img.naturalHeight-sh)
           sx=Math.max(0,Math.min(maxX,(img.naturalWidth-sw)/2+(maxX*item.panX/100)))
           sy=Math.max(0,Math.min(maxY,(img.naturalHeight-sh)/2+(maxY*item.panY/100)))
-          if(item.mode==='exact'){outW=Math.round(targetW/2.54*item.dpi);outH=Math.round(targetH/2.54*item.dpi)}else{outW=Math.max(1,Math.round(sw));outH=Math.max(1,Math.round(sh))}
+          if(item.mode==='exact'){outW=Math.round(tw/2.54*item.dpi);outH=Math.round(th/2.54*item.dpi)}else{outW=Math.max(1,Math.round(sw));outH=Math.max(1,Math.round(sh))}
         }
         const canvas=document.createElement('canvas');canvas.width=outW;canvas.height=outH
         const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Canvas neprieinamas')
@@ -93,36 +102,49 @@ function BatchProcessor(){
       }catch(e){next[i]={...item,status:'error',message:e instanceof Error?e.message:String(e)}}
       setItems([...next]);setMessage(`Apdorota ${i+1} iš ${next.length}`)
     }
-    setBusy(false);setMessage('Apdorojimas baigtas. Kiekvienai nuotraukai pritaikyti jos individualūs nustatymai.')
+    setBusy(false);setMessage('Apdorojimas baigtas.')
   }
   async function downloadAll(){const ready=items.filter(i=>i.output&&i.outputName);if(!ready.length)return;const {default:JSZip}=await import('jszip');const zip=new JSZip();ready.forEach(i=>zip.file(i.outputName!,i.output!));const blob=await zip.generateAsync({type:'blob',compression:'STORE'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='photo-batch.zip';a.click();URL.revokeObjectURL(url)}
   function downloadOne(item:BatchItem){if(!item.output||!item.outputName)return;const url=URL.createObjectURL(item.output),a=document.createElement('a');a.href=url;a.download=item.outputName;a.click();URL.revokeObjectURL(url)}
-  return <section className="batchWorkspace">
-    <div className="batchHeader"><div><div className="eyebrow">MASINIS APDOROJIMAS</div><h2>Partijų apdorojimas</h2><p>Kiekvienai nuotraukai atskirai pasirink formatą, kadravimą, priartinimą ir kopijų skaičių.</p></div><button className="analyze" onClick={()=>input.current?.click()}><ImagePlus size={17}/> Pridėti nuotraukas</button><input ref={input} hidden multiple type="file" accept="image/*,.heic,.heif,.tif,.tiff,.bmp,.avif,.gif" onChange={e=>{addFiles(e.target.files);e.currentTarget.value=''}}/></div>
-    <div className="batchGalleryHead"><h3><Images size={18}/> Nuotraukų sąrašas <span>{items.length}</span></h3><div className="batchActions"><button className="secondaryBtn" disabled={!items.length||busy} onClick={()=>{items.forEach(i=>URL.revokeObjectURL(i.previewUrl));setItems([]);setSelected(null)}}><Trash2 size={15}/> Išvalyti</button><label className="field batchOutput">Eksportas<select value={output} onChange={e=>setOutput(e.target.value as BatchOutput)}><option value="jpg">JPG 100 %</option><option value="tif">TIFF be suspaudimo</option></select></label><button className="analyze" disabled={!items.length||busy} onClick={processAll}>{busy?<Loader2 className="spin"/>:<Zap size={16}/>} Apdoroti visas</button><button className="analyze" disabled={!items.some(i=>i.output)||busy} onClick={downloadAll}><Download size={16}/> ZIP</button></div></div>
+  const moveSelection=(delta:number)=>{const idx=items.findIndex(i=>i.id===selected);const nextItem=items[idx+delta];if(nextItem)setSelected(nextItem.id)}
+  return <section className="batchWorkspace batchLightroom">
+    <div className="batchHeader"><div><div className="eyebrow">MASINIS APDOROJIMAS</div><h2>Partijų apdorojimas</h2><p>Vienas bendras spausdinimo formatas, individualus kiekvienos nuotraukos kadravimas ir kopijų skaičius.</p></div><button className="analyze" onClick={()=>input.current?.click()}><ImagePlus size={17}/> Pridėti nuotraukas</button><input ref={input} hidden multiple type="file" accept="image/*,.heic,.heif,.tif,.tiff,.bmp,.avif,.gif" onChange={e=>{addFiles(e.target.files);e.currentTarget.value=''}}/></div>
+    <div className="batchTopSettings">
+      <label className="field">Bendras foto popieriaus formatas<select value={formatIndex} onChange={e=>setFormatIndex(Number(e.target.value))}>{BATCH_FORMATS.map((f,i)=><option key={f.label} value={i}>{f.label}</option>)}</select></label>
+      <div className="orientationGroup"><span>Orientacija</span><div><button className={orientation==='portrait'?'active':''} onClick={()=>setOrientation('portrait')}>Vertikali</button><button className={orientation==='landscape'?'active':''} onClick={()=>setOrientation('landscape')}>Horizontali</button></div></div>
+      <div className="batchFormatSummary"><b>{targetW} × {targetH} cm</b><small>Taikoma visoms nuotraukoms</small></div>
+      <label className="field batchOutput">Eksportas<select value={output} onChange={e=>setOutput(e.target.value as BatchOutput)}><option value="jpg">JPG 100 %</option><option value="tif">TIFF be suspaudimo</option></select></label>
+    </div>
+    <div className="batchToolbar">
+      <div className="batchCount"><b>{items.length}</b> nuotraukų {selectedItem&&<span> · {items.findIndex(i=>i.id===selected)+1} / {items.length}</span>}</div>
+      <div className="batchActions"><button className="secondaryBtn" disabled={!items.length||busy} onClick={()=>{items.forEach(i=>URL.revokeObjectURL(i.previewUrl));setItems([]);setSelected(null)}}><Trash2 size={15}/> Išvalyti</button><button className="analyze" onClick={()=>input.current?.click()}><ImagePlus size={15}/> Pridėti</button><button className="analyze" disabled={!items.length||busy} onClick={processAll}>{busy?<Loader2 className="spin"/>:<Zap size={16}/>} Apdoroti visas</button><button className="analyze" disabled={!items.some(i=>i.output)||busy} onClick={downloadAll}><Download size={16}/> ZIP</button></div>
+    </div>
     {message&&<p className="batchMessage">{message}</p>}
-    {!items.length?<button className="batchEmpty" onClick={()=>input.current?.click()}><ImagePlus size={36}/><b>Įkelk iki 100 nuotraukų ar daugiau</b><span>JPG, PNG, HEIC, GIF, WebP, BMP, TIFF ir kiti naršyklės palaikomi vaizdai</span></button>:<div className="batchEditorLayout">
-      <div className="thumbGrid">{items.map(item=><button key={item.id} className={`thumbCard ${selected===item.id?'chosen':''}`} onClick={()=>setSelected(item.id)}><div className="thumbPreview"><img src={item.previewUrl} alt=""/>{item.output&&<span className="doneMark">✓</span>}<span className="thumbExt">{item.file.name.split('.').pop()?.toUpperCase()}</span></div><b title={item.file.name}>{item.file.name}</b><small>{item.status==='done'?`${item.width} × ${item.height} px`:item.status==='error'?item.message:'Laukia apdorojimo'}</small></button>)}</div>
-      {selectedItem&&<aside className="batchEditor">
-        <div className="batchEditorTitle"><b>{selectedItem.file.name}</b><span>{(selectedItem.file.size/1024/1024).toFixed(2)} MB · {selectedItem.status==='done'?'Paruošta':selectedItem.status==='error'?'Klaida':'Laukia'}</span></div>
-        <div className="batchPreview" style={{aspectRatio:`${selectedItem.mode==='exact'?selectedItem.exactW:formatFor(selectedItem).w} / ${selectedItem.mode==='exact'?selectedItem.exactH:formatFor(selectedItem).h}`}}><img src={selectedItem.previewUrl} alt="Nuotraukos peržiūra" style={{objectFit:selectedItem.mode==='fit'?'contain':'cover',transform:`translate(${selectedItem.panX/2}%,${selectedItem.panY/2}%) scale(${selectedItem.zoom})`}}/></div>
-        <div className="batchControls">
-          <label className="field">Foto popieriaus formatas<select value={selectedItem.format} onChange={e=>{const f=BATCH_FORMATS.find(x=>`${x.w}x${x.h}`===e.target.value)!;update(selectedItem.id,{format:e.target.value,ratio:f.w/f.h})}}>{BATCH_FORMATS.map(f=><option value={`${f.w}x${f.h}`} key={f.label}>{f.label}</option>)}</select></label>
-          <label className="field">Apkirpimo būdas<select value={selectedItem.mode} onChange={e=>update(selectedItem.id,{mode:e.target.value as BatchCropMode})}><option value="ratio">Pagal proporciją (maks. originalūs pikseliai)</option><option value="exact">Tikslus formatas + DPI</option><option value="fit">Įtalpinti su baltais kraštais</option></select></label>
+    {!items.length?<button className="batchEmpty" onClick={()=>input.current?.click()}><ImagePlus size={36}/><b>Įkelk nuotraukas</b><span>JPG, PNG, HEIC, GIF, WebP, BMP ir TIFF</span></button>:selectedItem&&<>
+      <div className="batchMainEditor">
+        <div className="batchCanvasTop"><div><b>{selectedItem.file.name}</b><span>{(selectedItem.file.size/1024/1024).toFixed(2)} MB · {selectedItem.status==='done'?'Paruošta':selectedItem.status==='error'?'Klaida':'Laukia apdorojimo'}</span></div><div className="canvasNav"><button title="Ankstesnė nuotrauka" onClick={()=>moveSelection(-1)} disabled={items.findIndex(i=>i.id===selected)===0}><ChevronLeft/></button><button title="Kita nuotrauka" onClick={()=>moveSelection(1)} disabled={items.findIndex(i=>i.id===selected)===items.length-1}><ChevronRight/></button></div></div>
+        <div className="batchCanvasStage">
+          <div className="batchCropFrame" style={{aspectRatio:`${targetW}/${targetH}`}} onPointerDown={onCropPointerDown} onPointerMove={onCropPointerMove} onPointerUp={onCropPointerUp} onPointerCancel={onCropPointerUp}>
+            <img draggable={false} src={selectedItem.previewUrl} alt="Kadravimo peržiūra" style={{transform:`translate(${selectedItem.panX/2}%,${selectedItem.panY/2}%) scale(${selectedItem.zoom})`}}/>
+            <div className="cropGridOverlay"><i/><i/><i/><i/></div>
+            <span className="cropHint">Vilk nuotrauką ir pasirink kadrą</span>
+          </div>
+        </div>
+        <div className="batchCanvasControls">
+          <div className="zoomButtons"><button title="Atitolinti" disabled={selectedItem.zoom<=1} onClick={()=>update(selectedItem.id,{zoom:Math.max(1,Number((selectedItem.zoom-.15).toFixed(2)))})}><ZoomOut/></button><b>{selectedItem.zoom.toFixed(2)}×</b><button title="Priartinti" disabled={selectedItem.zoom>=4} onClick={()=>update(selectedItem.id,{zoom:Math.min(4,Number((selectedItem.zoom+.15).toFixed(2)))})}><ZoomIn/></button><button className="resetCrop" onClick={()=>update(selectedItem.id,{zoom:1,panX:0,panY:0})}><RotateCcw size={14}/> Atstatyti</button></div>
+          <div className="cropModeButtons"><button className={selectedItem.mode==='ratio'?'active':''} onClick={()=>update(selectedItem.id,{mode:'ratio'})}>Apkirpti pagal formatą</button><button className={selectedItem.mode==='fit'?'active':''} onClick={()=>update(selectedItem.id,{mode:'fit'})}>Įtalpinti su baltais kraštais</button><button className={selectedItem.mode==='exact'?'active':''} onClick={()=>update(selectedItem.id,{mode:'exact'})}>Tikslus matmuo + DPI</button></div>
           {selectedItem.mode==='exact'&&<div className="exactFields"><label className="field">Plotis, cm<input type="number" min="1" step="0.1" value={selectedItem.exactW} onChange={e=>update(selectedItem.id,{exactW:Math.max(1,Number(e.target.value)||1)})}/></label><label className="field">Aukštis, cm<input type="number" min="1" step="0.1" value={selectedItem.exactH} onChange={e=>update(selectedItem.id,{exactH:Math.max(1,Number(e.target.value)||1)})}/></label><label className="field">DPI<input type="number" min="1" step="1" value={selectedItem.dpi} onChange={e=>update(selectedItem.id,{dpi:Math.max(1,Number(e.target.value)||1)})}/></label></div>}
-          <label className="field">Priartinimas: {selectedItem.zoom.toFixed(2)}×<input type="range" min="1" max="4" step=".01" value={selectedItem.zoom} onChange={e=>update(selectedItem.id,{zoom:Number(e.target.value)})}/></label>
-          <label className="field">Pastumti horizontaliai: {selectedItem.panX}%<input type="range" min="-100" max="100" value={selectedItem.panX} onChange={e=>update(selectedItem.id,{panX:Number(e.target.value)})}/></label>
-          <label className="field">Pastumti vertikaliai: {selectedItem.panY}%<input type="range" min="-100" max="100" value={selectedItem.panY} onChange={e=>update(selectedItem.id,{panY:Number(e.target.value)})}/></label>
-          <label className="field">Kopijų skaičius šiai nuotraukai<input type="number" min="1" max="99" value={selectedItem.copies} onChange={e=>update(selectedItem.id,{copies:Math.max(1,Math.min(99,Number(e.target.value)||1))})}/><small>{selectedItem.copies>1?`${selectedItem.copies}x - ${selectedItem.file.name.replace(/\.[^.]+$/,'')}`:'Numatyta: 1 kopija, prefikso nėra'}</small></label>
-          {selectedItem.mode==='exact'&&<p className="batchInfo">Eksportas: {Math.round(selectedItem.exactW/2.54*selectedItem.dpi)} × {Math.round(selectedItem.exactH/2.54*selectedItem.dpi)} px, {selectedItem.exactW} × {selectedItem.exactH} cm, {selectedItem.dpi} DPI.</p>}
-          {selectedItem.mode==='fit'&&<p className="batchInfo">Nuotrauka bus įtalpinta į pasirinkto formato proporciją. Laisva vieta užpildoma balta spalva.</p>}
+          <label className="copiesControl"><span>Kopijų skaičius</span><input type="number" min="1" max="99" value={selectedItem.copies} onChange={e=>update(selectedItem.id,{copies:Math.max(1,Math.min(99,Number(e.target.value)||1))})}/><small>{selectedItem.copies>1?`Failas: ${selectedItem.copies}x - ${selectedItem.file.name}`:'1 = originalus failo pavadinimas'}</small></label>
           {selectedItem.output&&<button className="secondaryBtn" onClick={()=>downloadOne(selectedItem)}><Download size={15}/> Atsisiųsti šią nuotrauką</button>}
         </div>
-      </aside>}
-    </div>}
-    <p className="hint">„Pagal proporciją“ iškerpa pagal formato santykį, bet neperkeičia pikselių į dirbtinę DPI raišką. „Tikslus formatas“ perskaičiuoja pikselių matmenis pagal įvestą cm ir DPI. „Įtalpinti“ išsaugo visą vaizdą ir prideda baltus kraštus. GIF apdorojamas kaip pirmasis kadras, RAW nepalaikomas.</p>
+      </div>
+      <div className="filmstripHeader"><b>Nuotraukų juosta</b><span>Pasirink nuotrauką redagavimui</span></div>
+      <div className="batchFilmstrip">{items.map((item,index)=><button key={item.id} className={`filmstripItem ${selected===item.id?'selected':''}`} onClick={()=>setSelected(item.id)}><div className="filmstripThumb"><img src={item.previewUrl} alt=""/>{item.status==='done'&&<span className="filmDone"><Check size={12}/></span>}{item.status==='error'&&<span className="filmError">!</span>}</div><b>{item.file.name}</b><small>{item.copies>1?`${item.copies}× kopijų`:'1 kopija'} · {index+1}</small></button>)}</div>
+    </>}
+    <p className="hint">Nuotrauką galima stumdyti tiesiogiai peržiūros lange. Priartinimas valdomas mygtukais. Pasirinktas formatas ir orientacija taikomi visai partijai, o kadravimas ir kopijų skaičius išlieka individualūs. GIF apdorojamas kaip pirmasis kadras.</p>
   </section>
 }
+
 
 export default function App() {
   const [activeTab,setActiveTab] = useState<'quality'|'batch'>('quality')

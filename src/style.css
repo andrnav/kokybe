@@ -86,3 +86,57 @@
 .batchOutput select{background:#17252c;color:#eef5f4;border:1px solid #3a5058;border-radius:8px;padding:9px}
 @media(max-width:1050px){.batchEditorLayout{grid-template-columns:1fr}.batchEditor{position:static}.batchControls{max-height:none}.batchPreview{max-width:680px;margin:0 auto}}
 @media(max-width:600px){.exactFields{grid-template-columns:1fr}.batchActions{align-items:stretch}.batchActions>*{flex:1}}
+
+/* 4.6 Lightroom / Printbox-inspired batch workspace */
+.batchLightroom{color:#e8eef0}
+.batchLightroom .batchTopSettings{display:flex;align-items:end;gap:14px;flex-wrap:wrap;background:#17252c;border:1px solid #34464e;border-radius:10px;padding:13px 15px;margin:14px 0}
+.batchLightroom .batchTopSettings .field{display:flex;flex-direction:column;gap:6px;min-width:170px;font-size:12px;color:#c4d0d4}
+.batchLightroom .batchTopSettings select{background:#0e191f;color:#f0f4f5;border:1px solid #42545c;border-radius:7px;padding:9px 30px 9px 10px}
+.orientationGroup{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#c4d0d4}
+.orientationGroup>div{display:flex;background:#0e191f;border:1px solid #42545c;border-radius:7px;padding:3px}
+.orientationGroup button{border:0;background:transparent;color:#b8c5ca;padding:7px 12px;border-radius:5px;cursor:pointer}
+.orientationGroup button.active{background:#356f60;color:white}
+.batchFormatSummary{display:flex;flex-direction:column;gap:4px;padding:0 10px 5px}
+.batchFormatSummary b{font-size:17px;color:#fff}
+.batchFormatSummary small{font-size:10px;color:#9eafb6}
+.batchLightroom .batchToolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:12px 0}
+.batchCount{font-size:12px;color:#aebdc2}.batchCount b{font-size:18px;color:#fff}
+.batchMainEditor{background:#111b20;border:1px solid #33444b;border-radius:10px;overflow:hidden}
+.batchCanvasTop{display:flex;align-items:center;justify-content:space-between;padding:11px 15px;background:#1c2a31;border-bottom:1px solid #35464d}
+.batchCanvasTop>div:first-child{display:flex;flex-direction:column;gap:4px;min-width:0}
+.batchCanvasTop b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.batchCanvasTop span{font-size:10px;color:#9eafb6}
+.canvasNav{display:flex;gap:5px}.canvasNav button,.zoomButtons button{display:inline-flex;align-items:center;justify-content:center;background:#263940;color:#e8f0f0;border:1px solid #455a62;border-radius:6px;width:34px;height:32px;cursor:pointer}.canvasNav button:disabled,.zoomButtons button:disabled{opacity:.35;cursor:default}
+.batchCanvasStage{height:min(62vh,650px);min-height:320px;background:#080e12;display:flex;align-items:center;justify-content:center;padding:18px;overflow:hidden}
+.batchCropFrame{position:relative;height:auto;width:auto;max-width:100%;max-height:100%;min-width:200px;min-height:200px;overflow:hidden;background:#10191d;box-shadow:0 0 0 1px #e9f3ef,0 0 0 3px #4a9a82;touch-action:none;cursor:grab;user-select:none}
+.batchCropFrame:active{cursor:grabbing}
+.batchCropFrame img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;pointer-events:none;user-select:none;will-change:transform}
+.cropGridOverlay{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(to right,transparent 33.15%,rgba(255,255,255,.48) 33.33%,transparent 33.5%,transparent 66.48%,rgba(255,255,255,.48) 66.66%,transparent 66.84%),linear-gradient(to bottom,transparent 33.15%,rgba(255,255,255,.48) 33.33%,transparent 33.5%,transparent 66.48%,rgba(255,255,255,.48) 66.66%,transparent 66.84%)}
+.cropHint{position:absolute;left:10px;bottom:10px;padding:6px 9px;background:rgba(7,16,20,.78);border:1px solid rgba(255,255,255,.25);border-radius:5px;color:#fff;font-size:10px;pointer-events:none}
+.batchCanvasControls{display:flex;align-items:center;gap:15px;flex-wrap:wrap;padding:11px 14px;background:#1b292f;border-top:1px solid #35464d}
+.zoomButtons{display:flex;align-items:center;gap:7px}.zoomButtons b{font-size:12px;min-width:42px;text-align:center}
+.zoomButtons svg,.canvasNav svg{width:16px;height:16px}
+.zoomButtons .resetCrop{width:auto;padding:0 10px;gap:5px;font-size:11px}
+.cropModeButtons{display:flex;gap:5px;flex-wrap:wrap}
+.cropModeButtons button{background:#263940;color:#c5d2d6;border:1px solid #455a62;border-radius:6px;padding:8px 10px;font-size:11px;cursor:pointer}
+.cropModeButtons button.active{background:#356f60;border-color:#5baf92;color:#fff}
+.exactFields{display:flex;gap:8px;flex:1;min-width:260px}
+.exactFields .field{display:flex;flex-direction:column;gap:4px;font-size:10px;color:#c5d2d6;min-width:0}
+.exactFields input{width:100%;min-width:65px;background:#0e191f;color:white;border:1px solid #455a62;border-radius:6px;padding:7px}
+.copiesControl{display:flex;align-items:center;gap:8px;font-size:11px;color:#dce5e7}
+.copiesControl input{width:58px;background:#0e191f;color:white;border:1px solid #455a62;border-radius:6px;padding:7px}
+.copiesControl small{color:#91a4ab;font-size:10px}
+.filmstripHeader{display:flex;justify-content:space-between;align-items:center;margin:16px 2px 7px;font-size:12px}
+.filmstripHeader span{font-size:10px;color:#91a4ab}
+.batchFilmstrip{display:flex;gap:8px;overflow-x:auto;padding:5px 2px 13px;scrollbar-width:thin;scrollbar-color:#52666e #17252c}
+.filmstripItem{flex:0 0 116px;width:116px;display:flex;flex-direction:column;gap:5px;text-align:left;background:#1a292f;border:1px solid #35474e;border-radius:7px;padding:6px;color:#e8eef0;cursor:pointer}
+.filmstripItem.selected{border:2px solid #65b99b;padding:5px;background:#203831}
+.filmstripThumb{height:70px;background:#0b1216;border-radius:4px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.filmstripThumb img{width:100%;height:100%;object-fit:contain}
+.filmstripItem>b{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.filmstripItem>small{font-size:9px;color:#91a4ab}
+.filmDone,.filmError{position:absolute;right:4px;top:4px;border-radius:50%;background:#287b5d;color:#fff;width:19px;height:19px;display:flex;align-items:center;justify-content:center}
+.filmError{background:#a94444}
+@media(max-width:760px){.batchLightroom .batchToolbar{align-items:flex-start;flex-direction:column}.batchCanvasStage{height:48vh;min-height:250px;padding:10px}.batchCanvasControls{align-items:flex-start;flex-direction:column}.batchTopSettings{align-items:stretch}.batchTopSettings .field{width:100%}.exactFields{width:100%}.copiesControl{flex-wrap:wrap}}
+
+.batchCropFrame{height:auto;flex:none}.batchCropFrame img{transform-origin:center center}
