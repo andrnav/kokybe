@@ -24,3 +24,10 @@ npm run dev
 ```
 
 Modeliai veikia naršyklėje per ONNX Runtime Web ir pirmą kartą atsisiunčiami iš modelių saugyklos. Tolimesnis veikimas priklauso nuo naršyklės cache nustatymų.
+
+
+## v2.1.1 pataisymai
+- Spaudos kadro peržiūra išlaiko tikrą formato proporciją ir nebėra tempiama per visą plotį.
+- Centrinė peržiūra apribota pagal ekrano aukštį ir plotį.
+- AI modelių rezultatai rodomi aiškiai atskirai; žinomos DBCNN, HyperIQA, MUSIQ ir CLIPIQA skalės orientaciškai perskaičiuojamos į 1–10.
+- MANIQA skaitinė skalė neperverčiama, nes šio modelio kortelėje nepateikta patikima riba.

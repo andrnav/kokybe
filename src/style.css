@@ -243,3 +243,16 @@
 .quality-ai-results .quality-results{padding-top:0;border-top:0}
 @media(max-width:900px){.quality-workspace-rebuilt{grid-template-columns:1fr}.quality-workspace-rebuilt .quality-control-panel{order:2}.quality-workspace-rebuilt .quality-preview-panel{order:1;min-height:420px}.quality-preview-stage-new{min-height:320px}.quality-canvas-frame{max-height:60vh}}
 @media(max-width:560px){.quality-live-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.quality-rating-live{grid-template-columns:1fr}.quality-ai-results-heading{flex-direction:column}.quality-edit-actions{grid-template-columns:1fr 1fr}}
+
+/* v2.1.1: crop peržiūros proporcijų ir mastelio pataisymas */
+.quality-workspace-rebuilt .quality-preview-panel{min-width:0;max-width:100%;overflow:hidden}
+.quality-preview-stage-new{min-height:340px;max-height:calc(100vh - 420px);padding:16px;overflow:auto}
+.quality-canvas-frame{flex:0 0 auto;max-width:100%;max-height:calc(100vh - 470px);min-width:220px;min-height:160px;display:block;overflow:hidden}
+.quality-canvas-frame canvas{width:100%;height:100%;display:block;object-fit:contain;image-rendering:auto}
+.quality-crop-guides{z-index:2}
+.quality-grid-overlay{z-index:3}
+.quality-ai-results{padding-bottom:18px}
+.quality-ai-results-heading{position:sticky;top:0;z-index:4;background:#171d27;border-bottom:1px solid #303b49}
+.quality-result-card .quality-raw-score{color:#8ea1b9;font-size:10px}
+.quality-result-card b{font-size:22px}
+@media(max-width:900px){.quality-preview-stage-new{max-height:none}.quality-canvas-frame{max-height:60vh}}
