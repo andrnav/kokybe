@@ -163,3 +163,60 @@
 .batchCropFrame.fitPreview{background:#fff}
 .batchCropFrame.fitPreview img{object-fit:contain!important}
 @media(max-width:900px){.photoQuickControls{justify-content:flex-start;width:100%}.batchCanvasTop{align-items:flex-start}}
+
+
+/* 5.0 Printbox-inspired batch order editor */
+.batchLightroom{background:#f6f7f8!important;color:#263238!important;border:1px solid #e1e5e8!important;border-radius:14px!important;padding:20px!important;gap:14px!important;box-shadow:0 2px 12px rgba(20,35,45,.06)}
+.batchLightroom .batchHeader{background:#fff;border:1px solid #e5e8eb;border-radius:10px;padding:14px 18px}
+.batchLightroom .batchHeader h2{color:#263238;font-size:22px}
+.batchLightroom .batchHeader p,.batchLightroom .eyebrow{color:#7b858b}
+.batchLightroom .batchToolbar{background:#fff;border:1px solid #e5e8eb;border-radius:9px;padding:10px 14px;margin:0}
+.batchLightroom .batchCount{color:#69757b}
+.batchLightroom .batchCount b{color:#263238}
+.printboxWorkspace{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:0;background:#fff;border:1px solid #e2e6e9;border-radius:11px;overflow:hidden;min-height:620px}
+.printboxGallery{padding:18px;min-width:0;background:#fafbfc}
+.printboxGalleryHead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.printboxGalleryHead>div{display:flex;flex-direction:column;gap:3px}
+.printboxGalleryHead b{font-size:15px;color:#303b40}
+.printboxGalleryHead span{font-size:11px;color:#899399}
+.printboxCards{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:14px;align-content:start}
+.printboxPhotoCard{min-width:0;background:#fff;border:1px solid #dfe4e7;border-radius:7px;overflow:hidden;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.printboxPhotoCard.isSelected{border:2px solid #f0785e;box-shadow:0 1px 5px rgba(230,105,77,.18)}
+.printboxCardTop{height:32px;padding:0 9px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid #edf0f1}
+.printboxCardTop b{font-size:10px;color:#4d585e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.printboxCardTop button{border:0;background:transparent;color:#ed785e;font-size:10px;white-space:nowrap;cursor:pointer}
+.printboxCardImage{height:155px;position:relative;overflow:hidden;background:#e9edef;touch-action:none;cursor:grab;display:flex;align-items:center;justify-content:center}
+.printboxCardImage:active{cursor:grabbing}
+.printboxCardImage img{position:absolute;width:100%;height:100%;pointer-events:none;user-select:none;will-change:transform}
+.printboxCropGrid{position:absolute;inset:0;pointer-events:none;border:1px solid rgba(255,255,255,.95);background:linear-gradient(to right,transparent 33.1%,rgba(255,255,255,.7) 33.3%,transparent 33.5%,transparent 66.4%,rgba(255,255,255,.7) 66.6%,transparent 66.8%),linear-gradient(to bottom,transparent 33.1%,rgba(255,255,255,.7) 33.3%,transparent 33.5%,transparent 66.4%,rgba(255,255,255,.7) 66.6%,transparent 66.8%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)}
+.printboxStatus{position:absolute;right:7px;top:7px;background:#3d9b78;color:#fff;padding:3px 7px;border-radius:10px;font-size:9px}
+.printboxCardFormat{display:flex;justify-content:space-between;padding:7px 9px;border-top:1px solid #edf0f1;color:#68747a;font-size:10px}
+.printboxCopies{height:33px;display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid #edf0f1}
+.printboxCopies button{border:0;background:#fff;color:#59656b;font-size:17px;cursor:pointer}
+.printboxCopies input{width:100%;border:0;text-align:center;color:#303b40;font-size:12px;background:#fff;outline:none}
+.printboxCardFoot{display:flex;justify-content:space-between;padding:5px 9px 7px;color:#9aa3a8;font-size:9px}
+.printboxSidebar{padding:18px 16px;border-left:1px solid #e5e8eb;background:#fff;display:flex;flex-direction:column;gap:15px}
+.printboxSidebar h3{font-size:14px;margin:0;color:#354147}
+.printboxSelectedStrip{display:flex;flex-direction:column;gap:4px;padding:10px;background:#f7f8f9;border:1px solid #e9edef;border-radius:6px}
+.printboxSelectedStrip b{font-size:11px;color:#414d53;overflow-wrap:anywhere}
+.printboxSelectedStrip span{font-size:10px;color:#919ba0}
+.printboxSidebar .field{display:flex;flex-direction:column;gap:6px;color:#7b858b;font-size:11px}
+.printboxSidebar .field select,.printboxSidebar .field input{width:100%;background:#fff;color:#354147;border:1px solid #dce2e5;border-radius:6px;padding:9px;font-size:12px}
+.printboxCustom{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.printboxFormatInfo{display:flex;flex-direction:column;gap:3px;padding:10px;background:#fff8f5;border:1px solid #f4ddd5;border-radius:6px}
+.printboxFormatInfo b{font-size:14px;color:#e8755c}
+.printboxFormatInfo small{font-size:10px;color:#9a8179}
+.printboxSetting{display:flex;flex-direction:column;gap:7px;color:#7b858b;font-size:11px}
+.printboxSegment{display:flex;border:1px solid #dfe4e7;border-radius:6px;padding:3px;gap:3px}
+.printboxSegment button{flex:1;min-width:0;padding:7px 4px;border:0;background:#fff;border-radius:4px;color:#667279;font-size:10px;cursor:pointer}
+.printboxSegment button.active{background:#fff0eb;color:#df7159;font-weight:700}
+.printboxZoom{display:flex;align-items:center;justify-content:space-between;border:1px solid #dfe4e7;border-radius:6px;padding:3px}
+.printboxZoom button{width:34px;height:29px;border:0;background:#f4f6f7;color:#4d5a60;border-radius:4px;font-size:17px;cursor:pointer}
+.printboxZoom button:disabled{opacity:.35;cursor:default}
+.printboxZoom b{font-size:11px;color:#39464c}
+.printboxSidebarActions{display:flex;flex-direction:column;gap:8px;margin-top:auto;padding-top:12px;border-top:1px solid #edf0f1}
+.printboxSidebarActions button{width:100%;justify-content:center}
+.batchLightroom .secondaryBtn{background:#fff;color:#536168;border:1px solid #dce2e5}
+.batchLightroom .batchMessage{color:#278663}
+@media(max-width:1000px){.printboxWorkspace{grid-template-columns:minmax(0,1fr) 250px}.printboxCards{grid-template-columns:repeat(auto-fill,minmax(175px,1fr))}}
+@media(max-width:720px){.printboxWorkspace{grid-template-columns:1fr}.printboxSidebar{border-left:0;border-top:1px solid #e5e8eb}.printboxCards{grid-template-columns:repeat(2,minmax(0,1fr))}.batchLightroom{padding:10px!important}.printboxGallery{padding:10px}.printboxSidebar{padding:14px}}

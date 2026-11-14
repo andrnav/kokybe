@@ -51,3 +51,8 @@ Partijų apdorojime kiekvienai nuotraukai atskirai galima nustatyti:
 - Kiekvienos nuotraukos nustatymai išsaugomi atskirai iki partijos eksporto.
 
 Pastaba: naršyklės peržiūra yra orientacinė. Galutinis kadravimas ir eksportas atliekamas pagal nustatytą formato santykį, priartinimą ir pastūmimą. Tikslus režimas gali didinti arba mažinti pikselių skaičių iki įvesto DPI matmenų; tai nekeičia pradinės detalės kiekio, jei šaltinio raiškos nepakanka.
+
+
+## 5.0 – Printbox-inspired batch editor
+
+Masinio apdorojimo langas pertvarkytas į šviesią užsakymo darbo erdvę: nuotraukų kortelių galerija, pasirinktos nuotraukos nustatymų šoninė juosta, bendras formatas, orientacija, kadravimo režimas, priartinimas, individualus kopijų skaičius ir eksportas. Nuotraukas galima pasirinkti galerijoje ir stumdyti tiesiogiai jų kortelėse.
