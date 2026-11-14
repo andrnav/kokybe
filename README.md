@@ -31,3 +31,7 @@ Modeliai veikia naršyklėje per ONNX Runtime Web ir pirmą kartą atsisiunčiam
 - Centrinė peržiūra apribota pagal ekrano aukštį ir plotį.
 - AI modelių rezultatai rodomi aiškiai atskirai; žinomos DBCNN, HyperIQA, MUSIQ ir CLIPIQA skalės orientaciškai perskaičiuojamos į 1–10.
 - MANIQA skaitinė skalė neperverčiama, nes šio modelio kortelėje nepateikta patikima riba.
+
+
+## v2.2.0 – nuotraukos kokybės santrauka
+Po analizės pateikiama viena aiški apkirpto kadro santrauka: spaudos tinkamumas, tikslus DPI, ryškumo ir susiliejimo rizikos indikatorius, triukšmo indikatorius, ekspozicija, AI modelių bendras signalas ir galutinė rekomendacija. DPI skaičiuojamas pagal apkirpto vaizdo pikselius ir pasirinktą fizinį spaudos dydį. Ryškumo, triukšmo ir ekspozicijos reikšmės yra automatiniai vaizdo signalų įverčiai, ne laboratoriniai matavimai.
