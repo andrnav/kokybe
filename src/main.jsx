@@ -1038,6 +1038,20 @@ function App() {
       <small className="iqa-note">Pirmiausia atliekami matematiniai matavimai. Papildomai galima paleisti CLIP AI antrą nuomonę.</small>
       <button className="primary quality-run" onClick={runQualityAnalysis} disabled={!qualityImage || ['loading','running'].includes(qualityStatus)}>{['loading','running'].includes(qualityStatus) ? <Loader2 className="spin" size={16}/> : <Sparkles size={16}/>} {qualityStatus === 'done' ? 'Analizuoti dar kartą' : 'Pradėti kokybės analizę'}</button>
       <div className={`quality-progress ${qualityStatus}`}>{qualityProgress || 'Matematinė analizė veikia vietoje. CLIP AI pirmą kartą parsisiunčiamas atskirai.'}</div>
+      {qualityResult && <div className="quality-sidebar-results">
+        <div className="quality-sidebar-results-head"><b>ANALIZĖS REZULTATAI</b><span>Atlikta</span></div>
+        <div className="quality-sidebar-score"><strong>{qualityResult.kadruoklisEvaluation.level}/5</strong><div><b>{qualityResult.kadruoklisEvaluation.label}</b><small>Spaudos tinkamumas</small></div></div>
+        <div className="quality-sidebar-stats">
+          <div><small>Efektyvi raiška</small><b>{Math.round(qualityResult.kadruoklisEvaluation.effectiveDpi)} DPI</b></div>
+          <div><small>Rekomenduojama</small><b>{Math.round(qualityResult.targetDpi)} DPI</b></div>
+          <div><small>Laplacian</small><b>{qualityResult.visual.lapVariance.toLocaleString('lt-LT')}</b></div>
+          <div><small>Tenengrad</small><b>{qualityResult.visual.tenengrad.toLocaleString('lt-LT')}</b></div>
+          <div><small>Triukšmas</small><b>{qualityResult.visual.noiseLabel}</b></div>
+          <div><small>Silpnos zonos</small><b>{qualityResult.visual.weakCount}/64</b></div>
+        </div>
+        <p>{qualityResult.summary.verdict}</p>
+        <small className="quality-sidebar-hint">Išsami analizė pateikta po nuotraukos peržiūros. Slinkite žemyn.</small>
+      </div>}
       <div className="quality-step-title">5. CLIP AI ANTRA NUOMONĖ</div>
       <small className="iqa-note">Claude projekto CLIP-ViT-B/16 modelis. Pirmą kartą reikia interneto ir apie 150 MB modelio failų. Nuotrauka apdorojama šiame įrenginyje ir niekur nesiunčiama.</small>
       {!clipAI && <button className="secondary quality-run" onClick={loadClipAI} disabled={clipAIStatus==='loading'}>{clipAIStatus==='loading' ? <Loader2 className="spin" size={16}/> : <Sparkles size={16}/>} {clipAIStatus==='loading'?'Įkeliamas CLIP modelis…':'Atsisiųsti CLIP modelį'}</button>}

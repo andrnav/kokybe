@@ -316,3 +316,19 @@
 /* Claude Kadruoklis CLIP model controls */
 .quality-run.secondary{width:100%;justify-content:center;margin-top:8px}
 .quality-progress.error{color:#ff9a9a}
+
+/* Visada matomi analizės rezultatai šalia analizės mygtuko */
+.quality-sidebar-results{margin-top:8px;padding:12px;border:1px solid #3c566d;border-radius:10px;background:#1b2a39;color:#e8eef6}
+.quality-sidebar-results-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.quality-sidebar-results-head>b{font-size:10px;letter-spacing:.1em;color:#a9bfd5}
+.quality-sidebar-results-head>span{font-size:10px;font-weight:700;color:#8fe0b0;background:#244536;padding:4px 8px;border-radius:20px}
+.quality-sidebar-score{display:flex;align-items:center;gap:10px;padding:8px 0 10px;border-bottom:1px solid #34485b}
+.quality-sidebar-score>strong{font-size:34px;line-height:1;color:#f4f8ff}
+.quality-sidebar-score>div{display:flex;flex-direction:column;gap:2px}
+.quality-sidebar-score>div>b{font-size:13px}
+.quality-sidebar-score small,.quality-sidebar-stats small{font-size:10px;color:#9fb1c4}
+.quality-sidebar-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.quality-sidebar-stats>div{display:flex;flex-direction:column;gap:3px;padding:7px;background:#223244;border-radius:7px;min-width:0}
+.quality-sidebar-stats b{font-size:12px;overflow-wrap:anywhere}
+.quality-sidebar-results>p{font-size:11px;line-height:1.45;color:#d6e1ed;margin:10px 0 5px}
+.quality-sidebar-hint{font-size:9px;color:#91a5ba}
