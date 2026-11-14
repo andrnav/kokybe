@@ -1070,7 +1070,7 @@ function App() {
           <div><small>Ekspozicija / kontrastas</small><b>{qualityResult.visual.exposure}</b><span>Kontrastas: {qualityResult.visual.contrast} · išdegimas: {qualityResult.visual.clipping}%</span></div>
         </div>
         <p className="quality-summary-verdict"><b>Matematinė išvada:</b> {qualityResult.summary.verdict}</p>
-        <section className={`quality-ai-conclusion ${qualityResult.ai ? 'is-ready' : 'is-pending'}`}>
+        <section className={"quality-ai-conclusion " + (qualityResult.ai ? "is-ready" : "is-pending")}>
           <div className="quality-ai-conclusion-title"><b>CLIP AI VERTINIMAS</b><span>{qualityResult.ai ? 'ANALIZĖ ATLIKTA' : 'LAUKIA ANALIZĖS'}</span></div>
           {qualityResult.ai ? <>
             <h4>{qualityResult.ai.quality >= .65 ? 'AI palankiai įvertino bendrą vaizdo kokybę' : qualityResult.ai.quality <= .35 ? 'AI aptiko galimų kokybės problemų' : 'AI rezultatas nėra vienareikšmis'}</h4>

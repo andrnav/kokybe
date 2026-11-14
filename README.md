@@ -88,3 +88,7 @@ Po analizės pateikiama viena aiški apkirpto kadro santrauka: spaudos tinkamuma
 ## v2.5.5 – build klaidos pataisymas
 - Pašalintas netyčia įterptas antras programos šaltinio fragmentas, kuris sukėlė `Expected ";" but found "React"` klaidą.
 - Atkurta viena pilna `src/main.jsx` importų ir programos struktūra.
+
+
+## v2.5.6 – JSX sintaksės pataisymas
+- CLIP išvados bloko `className` išraiška perrašyta be įdėtinio šabloninio teksto, kad JSX parseris neklystų dėl kabučių.
