@@ -1,4 +1,4 @@
-# FotoKadravimas v1.3
+# FotoKadravimas v1.4
 
 ## Paleidimas vietoje
 
@@ -11,7 +11,7 @@ npm run dev
 
 Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe/` iš `test` branch per GitHub Actions. Saugyklos `Settings → Pages → Build and deployment → Source` turi būti pasirinkta `GitHub Actions`.
 
-## v1.3 pakeitimai
+## v1.4 pakeitimai
 
 - „Balti kraštai“ pervadinti į „Įtalpinta“. Įtalpinimo režime galima priartinti ir pastumti nuotrauką, kad sumažėtų balti šonai; tai veikia ir pagrindinėje peržiūroje, ir eksporte.
 - Spausdinimo formatas pasirenkamas iš išskleidžiamo sąrašo; rankiniai matmenys automatiškai perjungia formatą į „Pagal skaičius“.
@@ -34,3 +34,4 @@ Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe
 ## Pastaba
 
 Šioje aplinkoje nepavyko įdiegti npm priklausomybių per skirtą laiką, todėl `npm run build` dar nebuvo patikrintas. GitHub Actions atliks build publikavimo metu ir parodys konkrečią klaidą, jei jos liko.
+\n\n## v1.4\n- Fixed fitted-mode thumbnails so the actual photo and white margins render together.\n- Crop and Real Size previews now show the full source image; the area outside the print crop is dimmed.\n

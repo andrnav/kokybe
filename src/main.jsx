@@ -86,8 +86,12 @@ function renderPhoto(photo, canvas, { thumbnail = false } = {}) {
     const outputScale = thumbnail ? Math.min(360 / sheetW, 360 / sheetH, 1) : 1;
     canvas.width = Math.max(1, Math.round(sheetW * outputScale));
     canvas.height = Math.max(1, Math.round(sheetH * outputScale));
-    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const fitScale = Math.min(canvas.width / photo.width, canvas.height / photo.height);
+    // Work in the sheet's original pixel coordinate system, then scale the
+    // entire composition. This keeps the thumbnail image and white margins
+    // in the same positions as the exported print.
+    ctx.scale(outputScale, outputScale);
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, sheetW, sheetH);
+    const fitScale = Math.min(sheetW / photo.width, sheetH / photo.height);
     const z = clamp(Number(photo.zoom || 1), 1, 4);
     const drawW = photo.width * fitScale * z, drawH = photo.height * fitScale * z;
     const maxX = Math.max(0, (drawW - sheetW) / 2), maxY = Math.max(0, (drawH - sheetH) / 2);
@@ -265,6 +269,7 @@ function App() {
       {active ? <>
         <div className={`print-sheet mode-${selectedMode}`} style={sheetStyle}>
           <img className="stage-photo" src={active.url} style={imageStyle} draggable="false" />
+          {selectedMode !== 'fit' && <div className="crop-shade" aria-hidden="true" />}
         </div>
         <div className="stage-hint"><Move size={14}/> {selectedMode === 'fit' ? 'Vilkite nuotrauką ir priartinkite, kad sumažintumėte baltus kraštus' : 'Vilkite nuotrauką norėdami pakeisti jos poziciją'}</div>
         <div className="zoom-control"><button onClick={e => { e.stopPropagation(); setZoomValue(zoom - .1); }}><ZoomOut size={17}/></button><span>{Math.round(zoom * 100)}%</span><button onClick={e => { e.stopPropagation(); setZoomValue(zoom + .1); }}><ZoomIn size={17}/></button></div>

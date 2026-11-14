@@ -18,7 +18,7 @@
 .thumb-image.status-done{border-color:#26bd76}
 
 /* Print-format preview: the white sheet itself is the exact selected aspect ratio. */
-.print-sheet{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);overflow:hidden;flex:none;isolation:isolate;background:#fff;box-shadow:0 12px 42px #0008}
+.print-sheet{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);overflow:visible;flex:none;isolation:isolate;background:#fff;box-shadow:0 12px 42px #0008}
 .print-sheet.mode-crop,.print-sheet.mode-real{background:#111720;box-shadow:0 0 0 9999px #080c13a8,0 12px 42px #0008;cursor:grab}
 .print-sheet.mode-crop:active,.print-sheet.mode-real:active{cursor:grabbing}
 .print-sheet.mode-fit{background:#fff;box-shadow:0 0 0 9999px #080c13a8,0 12px 42px #0008;cursor:default}
@@ -54,3 +54,10 @@
 .format-grid{display:none}
 @media(max-width:1100px){.workspace{grid-template-columns:220px minmax(0,1fr)}.right-panel{display:none}.thumb{flex-basis:150px;width:150px}}
 @media(max-width:760px){.workspace{display:flex;flex-direction:column}.editor-column{order:1;min-height:520px}.left-panel{order:2}.thumb{flex-basis:125px;width:125px}.photo-title-group{gap:6px}.photo-name{max-width:110px}.footer-actions{width:100%}.footer-actions button{flex:1}}
+
+/* v1.4: show the complete source image around the crop frame. */
+.print-sheet.mode-crop,.print-sheet.mode-real{background:transparent;overflow:visible}
+.print-sheet.mode-crop .stage-photo,.print-sheet.mode-real .stage-photo{z-index:1}
+.crop-shade{position:absolute;inset:0;z-index:2;border:1.5px solid #f5f8ff;box-shadow:0 0 0 9999px rgba(5,9,15,.66);pointer-events:none}
+.print-sheet.mode-fit{overflow:hidden}
+.print-sheet.mode-fit .stage-photo{z-index:1}
