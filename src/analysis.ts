@@ -120,7 +120,7 @@ export function qualityLabel(score: number): { label: string; color: string } {
   return { label: 'Prasta', color: 'red' }
 }
 
-export function recommendedSize(width: number, height: number, profile: PrintProfile, targetPpi: number) {
+export function recommendedSize(width: number, height: number, profile: PrintProfile, targetPpi: number = profile.good) {
   // Keep original aspect ratio. Width is the physical print width.
   const widthCm = width / (targetPpi / 2.54)
   const heightCm = height / (targetPpi / 2.54)
