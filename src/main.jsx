@@ -578,6 +578,11 @@ function App() {
   const [qualityStatus, setQualityStatus] = useState('idle');
   const [qualityProgress, setQualityProgress] = useState('');
   const [qualityResult, setQualityResult] = useState(null);
+  // CLIP AI būsenos. Ankstesniame leidime šie state kintamieji buvo
+  // naudojami UI ir funkcijose, bet nebuvo deklaruoti, todėl puslapis lūždavo.
+  const [clipAI, setClipAI] = useState(null);
+  const [clipAIStatus, setClipAIStatus] = useState('idle');
+  const [clipAIProgress, setClipAIProgress] = useState('');
   const [qualityOverlayVisible, setQualityOverlayVisible] = useState(true);
   const [kadruoklisConfig, setKadruoklisConfig] = useState(() => { try { const saved=JSON.parse(localStorage.getItem('foto-inspektorius-kadruoklis-quality')); return saved ? {...KADRUOKLIS_DEFAULTS,...saved,fractions:{...KADRUOKLIS_DEFAULTS.fractions,...saved.fractions},printers:{...KADRUOKLIS_DEFAULTS.printers,...saved.printers},sharp:{...KADRUOKLIS_DEFAULTS.sharp,...saved.sharp},noise:{...KADRUOKLIS_DEFAULTS.noise,...saved.noise},exposure:{...KADRUOKLIS_DEFAULTS.exposure,...saved.exposure}} : KADRUOKLIS_DEFAULTS; } catch { return KADRUOKLIS_DEFAULTS; } });
   const [qualityCropZoom, setQualityCropZoom] = useState(1);
