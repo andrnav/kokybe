@@ -220,3 +220,81 @@
 .batchLightroom .batchMessage{color:#278663}
 @media(max-width:1000px){.printboxWorkspace{grid-template-columns:minmax(0,1fr) 250px}.printboxCards{grid-template-columns:repeat(auto-fill,minmax(175px,1fr))}}
 @media(max-width:720px){.printboxWorkspace{grid-template-columns:1fr}.printboxSidebar{border-left:0;border-top:1px solid #e5e8eb}.printboxCards{grid-template-columns:repeat(2,minmax(0,1fr))}.batchLightroom{padding:10px!important}.printboxGallery{padding:10px}.printboxSidebar{padding:14px}}
+
+/* Printbox crop frame: fixed crop boundary, image content cannot be dragged outside it. */
+.printboxCardImage{
+  background:#111!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  overflow:hidden!important;
+}
+.printboxCropOutside{
+  position:relative;
+  width:100%;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#171717;
+  overflow:hidden;
+}
+.printboxCropWindow{
+  position:relative;
+  flex:none;
+  overflow:hidden;
+  box-shadow:0 0 0 999px rgba(0,0,0,.58);
+  outline:2px solid rgba(255,255,255,.96);
+  touch-action:none;
+}
+.printboxCropWindow img{
+  position:absolute!important;
+  inset:0;
+  width:100%!important;
+  height:100%!important;
+  max-width:none!important;
+  max-height:none!important;
+  pointer-events:none;
+  user-select:none;
+  transform-origin:center center;
+  will-change:transform;
+}
+.printboxCropGrid{
+  position:absolute;
+  inset:0;
+  z-index:2;
+  pointer-events:none;
+  border:1px solid rgba(255,255,255,.95);
+  background:
+    linear-gradient(to right,transparent 33.1%,rgba(255,255,255,.62) 33.3%,transparent 33.5%,transparent 66.4%,rgba(255,255,255,.62) 66.6%,transparent 66.8%),
+    linear-gradient(to bottom,transparent 33.1%,rgba(255,255,255,.62) 33.3%,transparent 33.5%,transparent 66.4%,rgba(255,255,255,.62) 66.6%,transparent 66.8%);
+}
+.cropHandle{
+  position:absolute;
+  z-index:3;
+  width:12px;height:12px;
+  border-radius:50%;
+  background:#fff;
+  border:1px solid #d4dadd;
+  box-shadow:0 1px 3px rgba(0,0,0,.35);
+}
+.cropHandle.tl{left:-6px;top:-6px}
+.cropHandle.tr{right:-6px;top:-6px}
+.cropHandle.bl{left:-6px;bottom:-6px}
+.cropHandle.br{right:-6px;bottom:-6px}
+.printboxCardImage.isFit .printboxCropOutside,
+.printboxCardImage.isFit .printboxCropWindow{background:#fff}
+.printboxCardFoot{align-items:center;gap:6px}
+.printboxDownloadOne{
+  display:inline-flex;align-items:center;gap:4px;
+  border:1px solid #d7e7df;border-radius:5px;
+  background:#f0faf5;color:#25845f;
+  padding:4px 7px;font-size:10px;cursor:pointer;
+}
+.printboxDownloadOne:hover{background:#e2f5eb}
+
+/* Keep the white crop grips fully visible inside the crop boundary. */
+.cropHandle.tl{left:3px;top:3px}
+.cropHandle.tr{right:3px;top:3px}
+.cropHandle.bl{left:3px;bottom:3px}
+.cropHandle.br{right:3px;bottom:3px}

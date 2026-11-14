@@ -75,6 +75,23 @@ function BatchProcessor(){
   const update=(id:string,patch:Partial<BatchItem>)=>setItems(prev=>prev.map(i=>i.id===id?{...i,...patch,status:'waiting',output:undefined,outputName:undefined}:i))
   const addFiles=(files:FileList|null)=>{if(!files)return;const accepted=Array.from(files).filter(f=>f.type.startsWith('image/')||/\.(heic|heif|tif|tiff|bmp|avif|gif)$/i.test(f.name));const added:BatchItem[]=accepted.map(file=>({id:`${file.name}-${file.size}-${Math.random()}`,file,previewUrl:URL.createObjectURL(file),status:'waiting' as const,format:'10x15',mode:'ratio' as BatchCropMode,ratio:2/3,panX:0,panY:0,zoom:1,copies:1,orientation:'auto' as const}));setItems(prev=>[...prev,...added]);if(!selected&&added[0])setSelected(added[0].id);setMessage('')}
   const selectedItem=items.find(i=>i.id===selected)
+  const cardFrameStyle=(item:BatchItem):React.CSSProperties=>{
+    const orientation=item.orientation==='auto'
+      ?((item.naturalWidth||1)>=(item.naturalHeight||1)?'landscape':'portrait')
+      :item.orientation
+    const w=orientation==='portrait'?Math.min(baseFormat.w,baseFormat.h):Math.max(baseFormat.w,baseFormat.h)
+    const h=orientation==='portrait'?Math.max(baseFormat.w,baseFormat.h):Math.min(baseFormat.w,baseFormat.h)
+    const r=w/h, boxW=100, boxH=155, boxR=boxW/boxH
+    if(r>boxR){const height=100*boxR/r;return {width:'100%',height:`${height}%`}}
+    const width=100*r/boxR
+    return {width:`${width}%`,height:'100%'}
+  }
+  const downloadItem=(item:BatchItem)=>{
+    if(!item.output||!item.outputName)return
+    const objectUrl=URL.createObjectURL(item.output)
+    const a=document.createElement('a');a.href=objectUrl;a.download=item.outputName;a.click()
+    window.setTimeout(()=>URL.revokeObjectURL(objectUrl),1000)
+  }
   const baseFormat=customFormat?{label:`${customW} × ${customH} cm`,w:customW,h:customH}:(BATCH_FORMATS[formatIndex]||BATCH_FORMATS[1])
   const selectedOrientation=selectedItem?.orientation==='auto'||!selectedItem?.orientation
     ?((selectedItem?.naturalWidth||1)>=(selectedItem?.naturalHeight||1)?'landscape':'portrait')
@@ -137,13 +154,19 @@ function BatchProcessor(){
         <div className="printboxGalleryHead"><div><b>Nuotraukos</b><span>{items.length} failai · pasirink nuotrauką koregavimui</span></div><button className="secondaryBtn" onClick={()=>input.current?.click()}><ImagePlus size={15}/> Pridėti nuotraukų</button></div>
         <div className="printboxCards">{items.map(item=><article key={item.id} className={`printboxPhotoCard ${selected===item.id?'isSelected':''} ${item.status==='done'?'isDone':''}`} onClick={()=>setSelected(item.id)}>
           <div className="printboxCardTop"><b>{item.file.name}</b><button onClick={e=>{e.stopPropagation();setSelected(item.id)}}>{selected===item.id?'Pasirinkta':'Pasirinkti'}</button></div>
-          <div className="printboxCardImage" onPointerDown={e=>{e.stopPropagation();setSelected(item.id);e.currentTarget.setPointerCapture(e.pointerId);drag.current={x:e.clientX,y:e.clientY,panX:item.panX,panY:item.panY}}} onPointerMove={e=>{if(!drag.current||selected!==item.id)return;const r=e.currentTarget.getBoundingClientRect();const dx=(e.clientX-drag.current.x)/Math.max(1,r.width)*180/Math.max(1,item.zoom);const dy=(e.clientY-drag.current.y)/Math.max(1,r.height)*180/Math.max(1,item.zoom);update(item.id,{panX:Math.max(-100,Math.min(100,drag.current.panX+dx)),panY:Math.max(-100,Math.min(100,drag.current.panY+dy))})}} onPointerUp={()=>{drag.current=null}}>
-            <img src={item.previewUrl} alt="" draggable={false} onLoad={e=>{const el=e.currentTarget;if(item.naturalWidth!==el.naturalWidth||item.naturalHeight!==el.naturalHeight)update(item.id,{naturalWidth:el.naturalWidth,naturalHeight:el.naturalHeight})}} style={{objectFit:item.mode==='fit'?'contain':'cover',objectPosition:'center',transform:`translate(${-item.panX/2}%,${-item.panY/2}%) scale(${item.zoom})`}}/>
-            <div className="printboxCropGrid"/>{item.status==='done'&&<span className="printboxStatus">Paruošta</span>}
+          <div className={`printboxCardImage ${item.mode==='fit'?'isFit':''}`} onPointerDown={e=>{e.stopPropagation();setSelected(item.id);e.currentTarget.setPointerCapture(e.pointerId);drag.current={x:e.clientX,y:e.clientY,panX:item.panX,panY:item.panY}}} onPointerMove={e=>{if(!drag.current||selected!==item.id)return;const r=e.currentTarget.getBoundingClientRect();const dx=(e.clientX-drag.current.x)/Math.max(1,r.width)*150/Math.max(1,item.zoom);const dy=(e.clientY-drag.current.y)/Math.max(1,r.height)*150/Math.max(1,item.zoom);update(item.id,{panX:Math.max(-100,Math.min(100,drag.current.panX+dx)),panY:Math.max(-100,Math.min(100,drag.current.panY+dy))})}} onPointerUp={()=>{drag.current=null}}>
+            <div className="printboxCropOutside">
+              <div className="printboxCropWindow" style={{...cardFrameStyle(item),background:item.mode==='fit'?'#fff':'#111'}}>
+                <img src={item.previewUrl} alt="" draggable={false} onLoad={e=>{const el=e.currentTarget;if(item.naturalWidth!==el.naturalWidth||item.naturalHeight!==el.naturalHeight)update(item.id,{naturalWidth:el.naturalWidth,naturalHeight:el.naturalHeight})}} style={{objectFit:item.mode==='fit'?'contain':'cover',objectPosition:`${50+item.panX/2}% ${50+item.panY/2}%`,transform:`scale(${item.zoom})`}}/>
+                <div className="printboxCropGrid"/>
+                <i className="cropHandle tl"/><i className="cropHandle tr"/><i className="cropHandle bl"/><i className="cropHandle br"/>
+              </div>
+            </div>
+            {item.status==='done'&&<span className="printboxStatus">Paruošta</span>}
           </div>
           <div className="printboxCardFormat"><span>{baseFormat.label}</span><span>{item.orientation==='auto'?'Auto':item.orientation==='portrait'?'Vertikali':'Horizontali'}</span></div>
           <div className="printboxCopies"><button onClick={e=>{e.stopPropagation();update(item.id,{copies:Math.max(1,item.copies-1)})}}>−</button><input aria-label="Kopijų skaičius" type="number" min="1" max="99" value={item.copies} onClick={e=>e.stopPropagation()} onChange={e=>update(item.id,{copies:Math.max(1,Math.min(99,Number(e.target.value)||1))})}/><button onClick={e=>{e.stopPropagation();update(item.id,{copies:Math.min(99,item.copies+1)})}}>＋</button></div>
-          <div className="printboxCardFoot"><small>{(item.file.size/1024/1024).toFixed(2)} MB</small><small>{item.status==='error'?'Klaida':item.status==='done'?'Atlikta':'Laukia'}</small></div>
+          <div className="printboxCardFoot"><small>{(item.file.size/1024/1024).toFixed(2)} MB</small><small>{item.status==='error'?'Klaida':item.status==='done'?'Atlikta':'Laukia'}</small>{item.output&&<button className="printboxDownloadOne" onClick={e=>{e.stopPropagation();downloadItem(item)}}><Download size={12}/> Atsisiųsti</button>}</div>
         </article>)}</div>
       </main>
       <aside className="printboxSidebar">
