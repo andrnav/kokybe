@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import JSZip from 'jszip';
-import heic2any from 'heic2any';
+import { heicTo } from 'heic-to';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import * as UTIF from 'utif';
@@ -95,11 +95,12 @@ async function decodeFile(file) {
   let blob = file;
   if (['heic', 'heif'].includes(ext)) {
     try {
-      const converted = await heic2any({ blob: file, toType: 'image/png' });
-      blob = Array.isArray(converted) ? converted[0] : converted;
+      // heic-to tracks newer libheif releases and supports HEIC variants
+      // that the older heic2any decoder cannot read.
+      blob = await heicTo({ blob: file, type: 'image/png' });
       if (!(blob instanceof Blob) || !blob.size) throw new Error('HEIC konverteris negrąžino vaizdo.');
     } catch (conversionError) {
-      // Some Safari versions can decode HEIC natively even when the converter fails.
+      // Try the platform decoder as a secondary route (available in some browsers).
       try {
         const bitmap = await createImageBitmap(file);
         const canvas = document.createElement('canvas');
@@ -111,8 +112,8 @@ async function decodeFile(file) {
           value => value ? resolve(value) : reject(new Error('Nepavyko konvertuoti HEIC vaizdo.')),
           'image/png'
         ));
-      } catch {
-        throw new Error(`Nepavyko perskaityti HEIC/HEIF failo „${file.name}“. ${conversionError?.message || ''}`.trim());
+      } catch (nativeError) {
+        throw new Error(`Nepavyko perskaityti HEIC/HEIF failo „${file.name}“. Dekoderis: ${conversionError?.message || 'nežinoma klaida'}. Naršyklė: ${nativeError?.message || 'HEIC nepalaikomas'}`.trim());
       }
     }
   } else if (['tif', 'tiff'].includes(ext)) {

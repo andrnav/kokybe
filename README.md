@@ -78,3 +78,11 @@ Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe
 - PDF puslapių failų pavadinimai gauna puslapio numerį, pvz. `Dokumentas - 001.png`.
 - Originalus HEIC/HEIF arba PDF failas nekeičiamas. Eksportuojamos tik apdorotos nuotraukų kopijos.
 - Nepavykus įkelti failo, pranešime parodomas konkretus failo pavadinimas ir klaidos priežastis.
+
+
+## v1.9.1 – HEIC dekoderio atnaujinimas
+
+- Pašalinta pasenusi `heic2any` biblioteka (0.0.4), kuri naudojo senesnį libheif ir atmesdavo dalį naujesnių HEIC kodavimo variantų.
+- Naudojama `heic-to` 1.6.7, paremta naujesniu libheif 1.23.7.
+- HEIC/HEIF konvertuojamas į PNG naršyklėje. PDF apdorojimo kodas nepakeistas.
+- Jei HEIC nepavyksta perskaityti, klaidos pranešime atskirai pateikiama dekoderio ir naršyklės klaida.
