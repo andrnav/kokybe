@@ -43,3 +43,10 @@ Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe
 - Added JPG and lossless 8-bit TIFF export.
 - Added live crop pixel, print-size, and DPI readouts.
 - Added unconstrained Free crop mode and Apply to all photos for the selected crop mode.
+
+
+## v1.6
+- Preview positioning now derives directly from the same source-pixel crop rectangle used by export.
+- Added print-size-aware resolution grading (editable DPI/PPI targets).
+- Added quality threshold settings with browser persistence and JSON import/export.
+- Added quality status beside pixel dimensions and effective resolution.
