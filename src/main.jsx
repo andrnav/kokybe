@@ -241,36 +241,99 @@ const IQA_MODELS = {
   maniqa: { label: 'MANIQA', size: '437 MB', file: 'maniqa_model.onnx', url: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/maniqa_model.onnx' },
   clipiqa: { label: 'CLIPIQA+', size: '146 MB', file: 'clipiqa_model.onnx', data: 'clipiqa_model.onnx.data', url: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/clipiqa_model.onnx', dataUrl: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/clipiqa_model.onnx.data' },
 };
-const IQA_CACHE = 'foto-inspektorius-iqa-models-v2';
-const iqaSessionPromises = {};
-async function loadIqaModel(id, onProgress) {
-  if (!iqaSessionPromises[id]) iqaSessionPromises[id] = (async () => {
-    const cfg = IQA_MODELS[id];
-    ort.env.wasm.numThreads = Math.min(4, Math.max(1, navigator.hardwareConcurrency || 2));
-    const modelBlob = await getCachedModelFile(cfg.url, cfg.file, v => onProgress?.('model', v));
-    const options = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
-    if (cfg.data) {
-      const dataBlob = await getCachedModelFile(cfg.dataUrl, cfg.data, v => onProgress?.('weights', v));
-      options.externalData = [{ path: cfg.data, data: dataBlob }];
-    }
-    return ort.InferenceSession.create(await modelBlob.arrayBuffer(), options);
-  })().catch(error => { delete iqaSessionPromises[id]; throw error; });
-  return iqaSessionPromises[id];
+const IQA_CACHE = 'foto-inspektorius-iqa-models-v3';
+
+// Modelių normalizavimas pagal IQA-ONNX-Models modelio kortelę.
+const IQA_PREPROCESS = {
+  dbcnn: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] },
+  hyperiqa: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] },
+  musiq: { mean: [0.5, 0.5, 0.5], std: [0.5, 0.5, 0.5] },
+  maniqa: { mean: [0.5, 0.5, 0.5], std: [0.5, 0.5, 0.5] },
+  clipiqa: { mean: [0.48145466, 0.4578275, 0.40821073], std: [0.26862954, 0.26130258, 0.27577711] },
+};
+
+async function getCachedModelFile(url, filename, onProgress) {
+  if (!('caches' in window)) {
+    throw new Error('Ši naršyklė nepalaiko modelių talpyklos. Naudokite naujausią Safari arba Chrome versiją.');
+  }
+  const cache = await caches.open(IQA_CACHE);
+  const cached = await cache.match(url);
+  if (cached) {
+    onProgress?.(100);
+    return await cached.blob();
+  }
+
+  let response;
+  try {
+    response = await fetch(url, { mode: 'cors', cache: 'no-cache' });
+  } catch (error) {
+    throw new Error(`Nepavyko pasiekti ${filename}. Patikrinkite interneto ryšį. (${error.message})`);
+  }
+  if (!response.ok) throw new Error(`Modelio failo ${filename} atsisiuntimas nepavyko: HTTP ${response.status}.`);
+
+  const total = Number(response.headers.get('content-length')) || 0;
+  if (!response.body?.getReader) {
+    const blob = await response.blob();
+    try { await cache.put(url, new Response(blob)); } catch (error) { console.warn('Nepavyko išsaugoti modelio talpykloje:', error); }
+    onProgress?.(100);
+    return blob;
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let received = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.byteLength;
+    onProgress?.(total ? Math.min(99, Math.round(received / total * 100)) : null);
+  }
+  const blob = new Blob(chunks, { type: 'application/octet-stream' });
+  try { await cache.put(url, new Response(blob)); } catch (error) { console.warn(`Nepavyko išsaugoti ${filename} talpykloje:`, error); }
+  onProgress?.(100);
+  return blob;
 }
 
-function imageToDbcnnTensor(image) {
-  const canvas = document.createElement('canvas'); canvas.width = 224; canvas.height = 224;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(image, 0, 0, 224, 224);
-  const pixels = ctx.getImageData(0, 0, 224, 224).data;
-  const mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225];
-  const data = new Float32Array(3 * 224 * 224);
-  for (let i = 0; i < 224 * 224; i++) {
-    data[i] = ((pixels[i * 4] / 255) - mean[0]) / std[0];
-    data[224 * 224 + i] = ((pixels[i * 4 + 1] / 255) - mean[1]) / std[1];
-    data[2 * 224 * 224 + i] = ((pixels[i * 4 + 2] / 255) - mean[2]) / std[2];
+async function loadIqaModel(id, onProgress) {
+  const cfg = IQA_MODELS[id];
+  if (!cfg) throw new Error(`Nežinomas AI modelis: ${id}`);
+  // Viena WASM gija: stabilesnis išorinių svorių įkėlimas naršyklėse.
+  ort.env.wasm.numThreads = 1;
+  const modelBlob = await getCachedModelFile(cfg.url, cfg.file, v => onProgress?.('model', v));
+  const options = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
+  if (cfg.data) {
+    const dataBlob = await getCachedModelFile(cfg.dataUrl, cfg.data, v => onProgress?.('weights', v));
+    options.externalData = [{ path: cfg.data, data: dataBlob }];
   }
-  return new ort.Tensor('float32', data, [1, 3, 224, 224]);
+  return await ort.InferenceSession.create(await modelBlob.arrayBuffer(), options);
+}
+
+function imageToIqaTensor(image, modelId) {
+  const cfg = IQA_PREPROCESS[modelId];
+  if (!cfg) throw new Error(`Nenurodytas ${modelId} modelio vaizdo paruošimas.`);
+  const size = 224;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(image, 0, 0, size, size);
+  const pixels = ctx.getImageData(0, 0, size, size).data;
+  const data = new Float32Array(3 * size * size);
+  for (let i = 0; i < size * size; i++) {
+    data[i] = ((pixels[i * 4] / 255) - cfg.mean[0]) / cfg.std[0];
+    data[size * size + i] = ((pixels[i * 4 + 1] / 255) - cfg.mean[1]) / cfg.std[1];
+    data[2 * size * size + i] = ((pixels[i * 4 + 2] / 255) - cfg.mean[2]) / cfg.std[2];
+  }
+  return new ort.Tensor('float32', data, [1, 3, size, size]);
+}
+
+function readIqaScore(outputMap, session) {
+  const outputName = session.outputNames[0];
+  const tensor = outputMap[outputName];
+  if (!tensor?.data?.length) throw new Error(`Modelis nepateikė skaitinio rezultato (${outputName || 'output'}).`);
+  const values = Array.from(tensor.data).filter(Number.isFinite);
+  if (!values.length) throw new Error('Modelio rezultatas nėra skaitinis.');
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
 function calculateSharpnessGrid(image) {
@@ -659,18 +722,28 @@ function App() {
         const id=selectedIqaModels[i], cfg=IQA_MODELS[id];
         setQualityStatus('running');
         setQualityProgress(`${cfg.label}: ${i+1}/${selectedIqaModels.length}. Modelio paruošimas / atsisiuntimas…`);
-        const session=await loadIqaModel(id,(part,value)=>setQualityProgress(`${cfg.label}: ${part==='model'?'modelis':'svoriai'} ${value==null?'atsisiunčiami':value+'%'}`));
-        setQualityProgress(`${cfg.label}: analizuojamas APKIRPTAS kadras…`);
-        const tensor=imageToDbcnnTensor(croppedImage);
-        const output=await session.run({[session.inputNames[0]]:tensor});
-        const raw=Number(output[session.outputNames[0]].data[0]);
-        results.push({id,label:cfg.label,score:raw});
+        let session;
+        try {
+          session=await loadIqaModel(id,(part,value)=>setQualityProgress(`${cfg.label}: ${part==='model'?'modelis':'svoriai'} ${value==null?'atsisiunčiami':value+'%'}`));
+          setQualityProgress(`${cfg.label}: analizuojamas APKIRPTAS kadras…`);
+          const tensor=imageToIqaTensor(croppedImage,id);
+          const output=await session.run({[session.inputNames[0]]:tensor});
+          const raw=readIqaScore(output,session);
+          results.push({id,label:cfg.label,score:raw});
+        } catch (modelError) {
+          console.error(`${cfg.label} nepavyko:`, modelError);
+          results.push({id,label:cfg.label,error:modelError.message || 'Nežinoma modelio klaida'});
+        } finally {
+          if (session) {
+            try { await session.release(); } catch (releaseError) { console.warn('Nepavyko atlaisvinti AI sesijos:', releaseError); }
+          }
+        }
       }
       const grid=calculateSharpnessGrid(croppedImage);
       const [wCm,hCm]=qualityDimensions;
       const dpiX=cropCanvas.width/(wCm/2.54), dpiY=cropCanvas.height/(hCm/2.54);
       setQualityResult({models:results,grid,dpiX,dpiY,width:cropCanvas.width,height:cropCanvas.height,weakTiles:grid.filter(t=>t.weak).length,analyzedAt:new Date().toISOString()});
-      setQualityStatus('done'); setQualityProgress('Analizė baigta. Visi pasirinkti modeliai vertino tik apkirptą spaudos kadrą.');
+      setQualityStatus(results.some(r=>!r.error) ? 'done' : 'error'); setQualityProgress(results.some(r=>r.error) ? `Analizė baigta iš dalies: ${results.filter(r=>!r.error).length}/${results.length} modelių pavyko. Klaidos pateiktos prie modelių.` : 'Analizė baigta. Visi pasirinkti modeliai vertino tik apkirptą spaudos kadrą.');
     } catch(error) { console.error('IQA analysis error:',error); setQualityStatus('error'); setQualityProgress(`AI analizė nepavyko: ${error.message||'nežinoma klaida'}`); }
   };
 
@@ -691,7 +764,7 @@ function App() {
     <section className="quality-preview-panel">
       <div className="quality-preview-heading"><div><b>Kadras, kuris bus siunčiamas AI analizei</b><span>Formato proporcijomis apkirptas vaizdas · keiskite priartinimą prieš analizę</span></div>{qualityResult && <span className="quality-score">{qualityResult.models.length} modeliai baigė</span>}</div>
       <div className="quality-preview-stage">{qualityImage ? <div className="quality-image-wrap quality-crop-wrap" style={{aspectRatio:`${qualityDimensions[0]}/${qualityDimensions[1]}`}}><img src={qualityImage.url} alt="Apkirpimo peržiūra" style={{width:`${qualityCropZoom*100}%`,height:`${qualityCropZoom*100}%`,maxWidth:'none',maxHeight:'none',objectFit:'cover',transform:`translate(${qualityPan.x*25}%,${qualityPan.y*25}%)`}}/>{qualityResult && <div className="quality-grid-overlay">{qualityResult.grid.map(tile => <div key={`${tile.x}-${tile.y}`} className={tile.weak ? 'weak' : ''} style={{ left: `${tile.x * 33.333}%`, top: `${tile.y * 33.333}%`, width: '33.333%', height: '33.333%' }}>{tile.weak && <span>Galimas ryškumo trūkumas</span>}</div>)}</div>}</div> : <div className="empty-stage"><Images size={48}/><b>Įkelkite nuotrauką analizei</b><span>Šiame bandyme vertinsime vieną nuotrauką vienu metu.</span><button className="primary" onClick={() => qualityFileRef.current?.click()}><ImagePlus size={17}/> Įkelti nuotrauką</button></div>}</div>
-      {qualityResult && <><div className="quality-results">{qualityResult.models.map(m=><div className="quality-result-card" key={m.id}><small>{m.label} AI įvertinimas</small><b>{m.score.toFixed(4)}</b><span>Neapdorotas modelio balas. Skirtingų modelių skalės nesulyginamos.</span></div>)}<div className="quality-result-card"><small>Apkirpto kadro raiška</small><b>{Math.round(Math.min(qualityResult.dpiX,qualityResult.dpiY))} DPI</b><span>{qualityResult.width} × {qualityResult.height} px pagal {qualityDimensions.join(' × ')} cm</span></div><div className="quality-result-card"><small>Galimos silpnesnės sritys</small><b>{qualityResult.weakTiles} / 9</b><span>Lokali ryškumo heuristika</span></div></div></>}
+      {qualityResult && <><div className="quality-results">{qualityResult.models.map(m=><div className={`quality-result-card ${m.error ? 'quality-result-error' : ''}`} key={m.id}><small>{m.label} AI įvertinimas</small><b>{m.error ? 'Nepavyko' : m.score.toFixed(4)}</b><span>{m.error || 'Neapdorotas modelio balas. Skirtingų modelių skalės nesulyginamos.'}</span></div>)}<div className="quality-result-card"><small>Apkirpto kadro raiška</small><b>{Math.round(Math.min(qualityResult.dpiX,qualityResult.dpiY))} DPI</b><span>{qualityResult.width} × {qualityResult.height} px pagal {qualityDimensions.join(' × ')} cm</span></div><div className="quality-result-card"><small>Galimos silpnesnės sritys</small><b>{qualityResult.weakTiles} / 9</b><span>Lokali ryškumo heuristika</span></div></div></>}
       <div className="quality-disclaimer"><AlertTriangle size={15}/> Pirmasis prototipas. Pasirinkti NR-IQA modeliai vertina apkirptą kadrą. Jų balai yra skirtingų skalių, todėl tiesiogiai tarpusavyje nelyginami. Pažymėtos sritys nustatomos papildomu vaizdo ryškumo algoritmu. Tai dar nėra patvirtintas spaudos tinkamumo verdiktas.</div>
     </section>
     <input ref={qualityFileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,image/*" hidden onChange={e => { loadQualityImage(e.target.files?.[0]); e.target.value = ''; }}/>
