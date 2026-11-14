@@ -73,7 +73,7 @@ function BatchProcessor(){
   const input=useRef<HTMLInputElement>(null)
   const drag=useRef<{x:number;y:number;panX:number;panY:number}|null>(null)
   const update=(id:string,patch:Partial<BatchItem>)=>setItems(prev=>prev.map(i=>i.id===id?{...i,...patch,status:'waiting',output:undefined,outputName:undefined}:i))
-  const addFiles=(files:FileList|null)=>{if(!files)return;const accepted=Array.from(files).filter(f=>f.type.startsWith('image/')||/\.(heic|heif|tif|tiff|bmp|avif|gif)$/i.test(f.name));const added=accepted.map(file=>({id:`${file.name}-${file.size}-${Math.random()}`,file,previewUrl:URL.createObjectURL(file),status:'waiting' as const,format:'10x15',mode:'ratio' as BatchCropMode,ratio:2/3,panX:0,panY:0,zoom:1,copies:1,orientation:'auto'}));setItems(prev=>[...prev,...added]);if(!selected&&added[0])setSelected(added[0].id);setMessage('')}
+  const addFiles=(files:FileList|null)=>{if(!files)return;const accepted=Array.from(files).filter(f=>f.type.startsWith('image/')||/\.(heic|heif|tif|tiff|bmp|avif|gif)$/i.test(f.name));const added:BatchItem[]=accepted.map(file=>({id:`${file.name}-${file.size}-${Math.random()}`,file,previewUrl:URL.createObjectURL(file),status:'waiting' as const,format:'10x15',mode:'ratio' as BatchCropMode,ratio:2/3,panX:0,panY:0,zoom:1,copies:1,orientation:'auto' as const}));setItems(prev=>[...prev,...added]);if(!selected&&added[0])setSelected(added[0].id);setMessage('')}
   const selectedItem=items.find(i=>i.id===selected)
   const baseFormat=customFormat?{label:`${customW} × ${customH} cm`,w:customW,h:customH}:(BATCH_FORMATS[formatIndex]||BATCH_FORMATS[1])
   const selectedOrientation=selectedItem?.orientation==='auto'||!selectedItem?.orientation
