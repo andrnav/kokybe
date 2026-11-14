@@ -92,3 +92,7 @@ Po analizės pateikiama viena aiški apkirpto kadro santrauka: spaudos tinkamuma
 
 ## v2.5.6 – JSX sintaksės pataisymas
 - CLIP išvados bloko `className` išraiška perrašyta be įdėtinio šabloninio teksto, kad JSX parseris neklystų dėl kabučių.
+
+
+## v2.5.7 – JSX klasės išraiškos pataisymas
+- „Kadruoklis“ vertinimo priežasčių sąraše dinaminė CSS klasė perrašyta į paprastą string konkatenaciją.

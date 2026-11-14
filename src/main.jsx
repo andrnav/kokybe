@@ -1087,7 +1087,7 @@ function App() {
         </section>
         <div className="quality-score-explanation">
           <b>„Kadruoklis“ vertinimo pagrindas</b>
-          <ul>{qualityResult.kadruoklisEvaluation.reasons.map((r,i)=><li key={i} className={`quality-reason-${r.tone}`}>{r.text}</li>)}</ul>
+          <ul>{qualityResult.kadruoklisEvaluation.reasons.map((r,i)=><li key={i} className={"quality-reason-" + r.tone}>{r.text}</li>)}</ul>
           <p>Naudojamas žiūrėjimo atstumas: {kadruoklisConfig.k} × spaudinio įstrižainė, ribose {kadruoklisConfig.minCm}–{kadruoklisConfig.maxCm} cm. Spaudos įrenginys parenkamas pagal trumpąją kraštinę: iki {kadruoklisConfig.maxMinilabCm} cm – Noritsu ({kadruoklisConfig.printers.noritsu.nativeDpi} DPI), didesniems – Mimaki ({kadruoklisConfig.printers.mimaki.nativeDpi} DPI).</p>
         </div>
         <details className="quality-score-explanation quality-config-details">
