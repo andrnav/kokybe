@@ -10,7 +10,7 @@ type ModelConfig = {
   externalFile: string
   modelUrl: string
   externalUrl: string
-  scoreScale: '0-1' | '0-100'
+  scoreScale: '0-1' | '0-100' | 'raw'
   normalization: 'imagenet' | 'minus-one-to-one'
   description: string
 }
@@ -26,8 +26,8 @@ const MODELS: Record<Mode, ModelConfig> = {
   optimized: {
     name: 'HyperIQA', modelFile: 'hyperiqa_model.onnx', externalFile: 'hyperiqa_model.onnx.data',
     modelUrl: `${HF}/hyperiqa_model.onnx`, externalUrl: `${HF}/hyperiqa_model.onnx.data`,
-    scoreScale: '0-1', normalization: 'imagenet',
-    description: 'HyperIQA; ImageNet normalization'
+    scoreScale: 'raw', normalization: 'imagenet',
+    description: 'HyperIQA; ImageNet normalization; raw regression output'
   },
   light: {
     name: 'DBCNN', modelFile: 'dbcnn_model.onnx', externalFile: 'dbcnn_model.onnx.data',
@@ -181,7 +181,7 @@ export async function runIqa(image: HTMLImageElement, mode: Mode, onProgress: (v
 
     const rawScore = scores.reduce((sum, value) => sum + value, 0) / scores.length
     const score = config.scoreScale === '0-1' ? rawScore * 100 : rawScore
-    if (score < 0 || score > 100) throw new Error(`${config.name} grąžino ${rawScore.toFixed(4)}, o dokumentuotas diapazonas yra ${config.scoreScale}. Balas nerodomas.`)
+    if (config.scoreScale === '0-100' && (score < 0 || score > 100)) throw new Error(`${config.name} grąžino neįprastą reikšmę: ${rawScore.toFixed(4)}.`)
     return { score: Math.round(score), rawScore, model: config.name, provider, durationMs: Math.round(performance.now() - started) }
   } finally {
     await session.release()
