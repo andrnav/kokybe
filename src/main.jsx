@@ -5,7 +5,7 @@ import { heicTo } from 'heic-to';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import * as UTIF from 'utif';
-import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2, ScanSearch, AlertTriangle, CheckCircle2, RotateCw } from 'lucide-react';
+import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2, ScanSearch, Sparkles, AlertTriangle, CheckCircle2, RotateCw } from 'lucide-react';
 import './style.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;

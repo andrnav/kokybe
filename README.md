@@ -52,3 +52,7 @@ Po analizės pateikiama viena aiški apkirpto kadro santrauka: spaudos tinkamuma
 - Žalios, raudonos ir neutralios zonos rodomos ant nuotraukos; jas galima įjungti arba išjungti.
 - FFT atskiras matavimas šiame leidime dar neįgyvendintas ir nėra pristatomas kaip atliktas.
 - Rodiklių ribos yra pradinės heuristikos. Reikia patikrinti su ryškių, išplaukusių, triukšmingų ir lygių sričių pavyzdžiais.
+
+
+## v2.4.2 pataisymas
+- Atkurta trūkstama `Sparkles` piktogramos importo deklaracija, dėl kurios naršyklėje įvykdavo `ReferenceError` ir puslapis likdavo tuščias.
