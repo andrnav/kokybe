@@ -42,3 +42,13 @@ Po analizės pateikiama viena aiški apkirpto kadro santrauka: spaudos tinkamuma
 - AI modelių pasirinkimo sąrašas pašalintas iš pagrindinės šoninės juostos; naudojami numatytieji analizės modeliai.
 - Priartinimo valdikliai perkelti ant nuotraukos, palaikomas pelės ratukas.
 - AI techniniai rezultatai paslėpti nuo pagrindinio naudotojo vaizdo; palikta kokybės santrauka.
+
+
+## v2.4.0 – matematinė nuotraukos analizė
+- Pašalintas ONNX Runtime AI modelių vykdymas ir modelių pasirinkimas.
+- Analizuojamas tik galutinis apkirptas kadras.
+- Kadras dalijamas į 8 × 8 (64) diagnostines zonas.
+- Naudojami Laplacian Variance, Tenengrad/Sobel kraštų stiprumas, triukšmo indikatorius, ekspozicijos ir 8 px blokų ribų indikatoriai.
+- Žalios, raudonos ir neutralios zonos rodomos ant nuotraukos; jas galima įjungti arba išjungti.
+- FFT atskiras matavimas šiame leidime dar neįgyvendintas ir nėra pristatomas kaip atliktas.
+- Rodiklių ribos yra pradinės heuristikos. Reikia patikrinti su ryškių, išplaukusių, triukšmingų ir lygių sričių pavyzdžiais.

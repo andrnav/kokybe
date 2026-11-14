@@ -5,8 +5,7 @@ import { heicTo } from 'heic-to';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import * as UTIF from 'utif';
-import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2, Sparkles, BrainCircuit, AlertTriangle, CheckCircle2, RotateCw } from 'lucide-react';
-import * as ort from 'onnxruntime-web';
+import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2, ScanSearch, AlertTriangle, CheckCircle2, RotateCw } from 'lucide-react';
 import './style.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -242,183 +241,74 @@ function renderPhoto(photo, canvas, { thumbnail = false } = {}) {
   ctx.drawImage(photo.image, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
 }
 
-const IQA_MODELS = {
-  dbcnn: { label: 'DBCNN', size: '59 MB', file: 'dbcnn_model.onnx', data: 'dbcnn_model.onnx.data', url: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/dbcnn_model.onnx', dataUrl: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/dbcnn_model.onnx.data' },
-  hyperiqa: { label: 'HyperIQA', size: '105 MB', file: 'hyperiqa_model.onnx', data: 'hyperiqa_model.onnx.data', url: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/hyperiqa_model.onnx', dataUrl: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/hyperiqa_model.onnx.data' },
-  musiq: { label: 'MUSIQ', size: '104 MB', file: 'musiq_model.onnx', data: 'musiq_model.onnx.data', url: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/musiq_model.onnx', dataUrl: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/musiq_model.onnx.data' },
-  maniqa: { label: 'MANIQA', size: '437 MB', file: 'maniqa_model.onnx', url: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/maniqa_model.onnx' },
-  clipiqa: { label: 'CLIPIQA+', size: '146 MB', file: 'clipiqa_model.onnx', data: 'clipiqa_model.onnx.data', url: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/clipiqa_model.onnx', dataUrl: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/clipiqa_model.onnx.data' },
-};
-const IQA_CACHE = 'foto-inspektorius-iqa-models-v3';
-
-// Modelių normalizavimas pagal IQA-ONNX-Models modelio kortelę.
-const IQA_PREPROCESS = {
-  dbcnn: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] },
-  hyperiqa: { mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] },
-  musiq: { mean: [0.5, 0.5, 0.5], std: [0.5, 0.5, 0.5] },
-  maniqa: { mean: [0.5, 0.5, 0.5], std: [0.5, 0.5, 0.5] },
-  clipiqa: { mean: [0.48145466, 0.4578275, 0.40821073], std: [0.26862954, 0.26130258, 0.27577711] },
-};
-
-async function getCachedModelFile(url, filename, onProgress) {
-  if (!('caches' in window)) {
-    throw new Error('Ši naršyklė nepalaiko modelių talpyklos. Naudokite naujausią Safari arba Chrome versiją.');
+function calculateSharpnessGrid(image) {
+  const cols=8, rows=8, canvas=document.createElement('canvas');
+  const scale=Math.min(1,768/Math.max(image.naturalWidth,image.naturalHeight));
+  canvas.width=Math.max(cols*24,Math.round(image.naturalWidth*scale));
+  canvas.height=Math.max(rows*24,Math.round(image.naturalHeight*scale));
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(image,0,0,canvas.width,canvas.height);
+  const {data,width,height}=ctx.getImageData(0,0,canvas.width,canvas.height);
+  const gray=new Float32Array(width*height);
+  for(let i=0,p=0;i<data.length;i+=4,p++) gray[p]=.2126*data[i]+.7152*data[i+1]+.0722*data[i+2];
+  const scores=[];
+  for(let gy=0;gy<rows;gy++) for(let gx=0;gx<cols;gx++){
+    const x0=Math.floor(gx*width/cols),x1=Math.floor((gx+1)*width/cols),y0=Math.floor(gy*height/rows),y1=Math.floor((gy+1)*height/rows);
+    let ls=0,l2=0,ss=0,texture=0,count=0;
+    for(let y=y0+1;y<y1-1;y++) for(let x=x0+1;x<x1-1;x++){
+      const i=y*width+x,v=gray[i],l=gray[i-1],r=gray[i+1],u=gray[i-width],d=gray[i+width];
+      const lap=l+r+u+d-4*v;
+      const sx=-gray[i-width-1]+gray[i-width+1]-2*l+2*r-gray[i+width-1]+gray[i+width+1];
+      const sy=-gray[i-width-1]-2*u-gray[i-width+1]+gray[i+width-1]+2*d+gray[i+width+1];
+      const sobel=Math.hypot(sx,sy);
+      ls+=lap;l2+=lap*lap;ss+=sobel*sobel;
+      if(Math.abs(l-r)+Math.abs(u-d)>12) texture++;
+      count++;
+    }
+    const lap=Math.sqrt(count?Math.max(0,l2/count-(ls/count)**2):0);
+    scores.push({x:gx,y:gy,lap,ten:count?ss/count:0,texture:count?texture/count:0});
   }
-  const cache = await caches.open(IQA_CACHE);
-  const cached = await cache.match(url);
-  if (cached) {
-    onProgress?.(100);
-    return await cached.blob();
-  }
-
-  let response;
-  try {
-    response = await fetch(url, { mode: 'cors', cache: 'no-cache' });
-  } catch (error) {
-    throw new Error(`Nepavyko pasiekti ${filename}. Patikrinkite interneto ryšį. (${error.message})`);
-  }
-  if (!response.ok) throw new Error(`Modelio failo ${filename} atsisiuntimas nepavyko: HTTP ${response.status}.`);
-
-  const total = Number(response.headers.get('content-length')) || 0;
-  if (!response.body?.getReader) {
-    const blob = await response.blob();
-    try { await cache.put(url, new Response(blob)); } catch (error) { console.warn('Nepavyko išsaugoti modelio talpykloje:', error); }
-    onProgress?.(100);
-    return blob;
-  }
-
-  const reader = response.body.getReader();
-  const chunks = [];
-  let received = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    received += value.byteLength;
-    onProgress?.(total ? Math.min(99, Math.round(received / total * 100)) : null);
-  }
-  const blob = new Blob(chunks, { type: 'application/octet-stream' });
-  try { await cache.put(url, new Response(blob)); } catch (error) { console.warn(`Nepavyko išsaugoti ${filename} talpykloje:`, error); }
-  onProgress?.(100);
-  return blob;
-}
-
-async function loadIqaModel(id, onProgress) {
-  const cfg = IQA_MODELS[id];
-  if (!cfg) throw new Error(`Nežinomas AI modelis: ${id}`);
-  // Viena WASM gija: stabilesnis išorinių svorių įkėlimas naršyklėse.
-  ort.env.wasm.numThreads = 1;
-  const modelBlob = await getCachedModelFile(cfg.url, cfg.file, v => onProgress?.('model', v));
-  const options = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
-  if (cfg.data) {
-    const dataBlob = await getCachedModelFile(cfg.dataUrl, cfg.data, v => onProgress?.('weights', v));
-    options.externalData = [{ path: cfg.data, data: dataBlob }];
-  }
-  return await ort.InferenceSession.create(await modelBlob.arrayBuffer(), options);
-}
-
-function imageToIqaTensor(image, modelId) {
-  const cfg = IQA_PREPROCESS[modelId];
-  if (!cfg) throw new Error(`Nenurodytas ${modelId} modelio vaizdo paruošimas.`);
-  const size = 224;
-  const canvas = document.createElement('canvas');
-  canvas.width = size; canvas.height = size;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(image, 0, 0, size, size);
-  const pixels = ctx.getImageData(0, 0, size, size).data;
-  const data = new Float32Array(3 * size * size);
-  for (let i = 0; i < size * size; i++) {
-    data[i] = ((pixels[i * 4] / 255) - cfg.mean[0]) / cfg.std[0];
-    data[size * size + i] = ((pixels[i * 4 + 1] / 255) - cfg.mean[1]) / cfg.std[1];
-    data[2 * size * size + i] = ((pixels[i * 4 + 2] / 255) - cfg.mean[2]) / cfg.std[2];
-  }
-  return new ort.Tensor('float32', data, [1, 3, size, size]);
-}
-
-function readIqaScore(outputMap, session) {
-  const outputName = session.outputNames[0];
-  const tensor = outputMap[outputName];
-  if (!tensor?.data?.length) throw new Error(`Modelis nepateikė skaitinio rezultato (${outputName || 'output'}).`);
-  const values = Array.from(tensor.data).filter(Number.isFinite);
-  if (!values.length) throw new Error('Modelio rezultatas nėra skaitinis.');
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function normalizeIqaScore(modelId, raw) {
-  // Normalizacija pagal modelio kortelėje paskelbtas mokymo skalės ribas.
-  // MANIQA skalė nenurodyta, todėl jos balo į 1–10 neverčiame spėliojant.
-  const ranges = {
-    dbcnn: [0, 100],
-    hyperiqa: [0, 1],
-    musiq: [0, 100],
-    clipiqa: [0, 1],
-  };
-  const range = ranges[modelId];
-  if (!range || !Number.isFinite(raw)) return null;
-  const normalized = Math.max(0, Math.min(1, (raw - range[0]) / (range[1] - range[0])));
-  return Math.round((1 + normalized * 9) * 10) / 10;
+  const textured=scores.filter(t=>t.texture>.025).map(t=>t.lap).sort((a,b)=>a-b);
+  const median=textured.length?textured[Math.floor(textured.length/2)]:0;
+  const avgTen=scores.reduce((a,b)=>a+b.ten,0)/scores.length;
+  return scores.map(t=>{
+    const weak=median>0&&t.texture>.025&&t.lap<median*.48&&t.ten<Math.max(900,avgTen*.45);
+    const good=median>0&&t.texture>.04&&t.lap>=median*.78;
+    return {...t,status:weak?'weak':good?'good':'neutral'};
+  });
 }
 
 function analyzeCropVisualMetrics(sourceImage) {
-  const canvas = document.createElement('canvas');
-  const size = 320;
-  const ratio = sourceImage.naturalWidth / sourceImage.naturalHeight;
-  canvas.width = ratio >= 1 ? size : Math.max(1, Math.round(size * ratio));
-  canvas.height = ratio >= 1 ? Math.max(1, Math.round(size / ratio)) : size;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(sourceImage, 0, 0, canvas.width, canvas.height);
-  const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const gray = new Float32Array(width * height);
-  let sum = 0, clippedDark = 0, clippedBright = 0;
-  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
-    const y = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-    gray[p] = y; sum += y;
-    if (y <= 5) clippedDark++;
-    if (y >= 250) clippedBright++;
+  const maxSide=960,scale=Math.min(1,maxSide/Math.max(sourceImage.naturalWidth,sourceImage.naturalHeight));
+  const width=Math.max(64,Math.round(sourceImage.naturalWidth*scale)),height=Math.max(64,Math.round(sourceImage.naturalHeight*scale));
+  const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(sourceImage,0,0,width,height);
+  const {data}=ctx.getImageData(0,0,width,height),gray=new Float32Array(width*height);
+  let sum=0,dark=0,bright=0;
+  for(let i=0,p=0;i<data.length;i+=4,p++){const v=.2126*data[i]+.7152*data[i+1]+.0722*data[i+2];gray[p]=v;sum+=v;if(v<=5)dark++;if(v>=250)bright++;}
+  const mean=sum/gray.length;let variance=0,lapSum=0,lapSq=0,noiseSum=0,noiseSq=0,sobelSq=0,blockSum=0,blockN=0,samples=0;
+  for(let y=1;y<height-1;y++)for(let x=1;x<width-1;x++){
+    const i=y*width+x,v=gray[i],l=gray[i-1],r=gray[i+1],u=gray[i-width],d=gray[i+width];
+    variance+=(v-mean)**2;const lap=l+r+u+d-4*v;lapSum+=lap;lapSq+=lap*lap;
+    const sx=-gray[i-width-1]+gray[i-width+1]-2*l+2*r-gray[i+width-1]+gray[i+width+1];
+    const sy=-gray[i-width-1]-2*u-gray[i-width+1]+gray[i+width-1]+2*d+gray[i+width+1];sobelSq+=sx*sx+sy*sy;
+    const residual=v-(l+r+u+d)/4;noiseSum+=residual;noiseSq+=residual*residual;
+    if(x%8===0){blockSum+=Math.abs(v-l);blockN++;}samples++;
   }
-  const count = gray.length;
-  const mean = sum / count;
-  let variance = 0, lapSum = 0, lapSq = 0, residualSum = 0, residualSq = 0, samples = 0;
-  for (let y = 1; y < height - 1; y++) for (let x = 1; x < width - 1; x++) {
-    const i = y * width + x, v = gray[i];
-    variance += (v - mean) ** 2;
-    const lap = gray[i - 1] + gray[i + 1] + gray[i - width] + gray[i + width] - 4 * v;
-    lapSum += lap; lapSq += lap * lap;
-    const local = (gray[i - 1] + gray[i + 1] + gray[i - width] + gray[i + width]) / 4;
-    const residual = v - local;
-    residualSum += residual; residualSq += residual * residual;
-    samples++;
-  }
-  const contrast = Math.sqrt(variance / count);
-  const lapVariance = Math.max(0, lapSq / samples - (lapSum / samples) ** 2);
-  const noiseProxy = Math.sqrt(Math.max(0, residualSq / samples - (residualSum / samples) ** 2));
-  const clipping = (clippedDark + clippedBright) / count * 100;
-  const sharpness = lapVariance >= 650 ? 'Aukštas' : lapVariance >= 180 ? 'Vidutinis' : 'Žemas';
-  const blur = lapVariance < 110 ? 'Padidėjusi' : lapVariance < 260 ? 'Nedidelė' : 'Maža';
-  const noise = noiseProxy >= 18 ? 'Didelis' : noiseProxy >= 10 ? 'Vidutinis' : 'Nedidelis';
-  const exposure = mean < 48 ? 'Tamsoka' : mean > 210 ? 'Per šviesi' : 'Subalansuota';
-  const clipped = clipping > 8 ? 'Ryškių arba tamsių sričių detalės gali būti prarastos' : clipping > 3 ? 'Kai kuriose vietose gali būti prarasta detalių' : 'Didelio išdegusių ar užjuodusių sričių kiekio nematyti';
-  return { sharpness, blur, noise, exposure, clipped, contrast: Math.round(contrast), lapVariance: Math.round(lapVariance), noiseProxy: Math.round(noiseProxy * 10) / 10, clipping: Math.round(clipping * 10) / 10 };
+  const lapVariance=Math.max(0,lapSq/samples-(lapSum/samples)**2);
+  const noise=Math.sqrt(Math.max(0,noiseSq/samples-(noiseSum/samples)**2));
+  const clipping=(dark+bright)/gray.length*100,grid=calculateSharpnessGrid(sourceImage);
+  const weakCount=grid.filter(t=>t.status==='weak').length,goodCount=grid.filter(t=>t.status==='good').length;
+  const textureCoverage=grid.filter(t=>t.texture>.08).length/grid.length*100;
+  const sharpness=textureCoverage<12?'Nepakanka detalių patikimai išvadai':weakCount>=23?'Didelė susiliejimo rizika':weakCount>=10?'Vietomis silpnesnis detalumas':'Detalumo signalas daugumoje zonų tolygus';
+  return {grid,width,height,mean:Math.round(mean),contrast:Math.round(Math.sqrt(variance/gray.length)),lapVariance:Math.round(lapVariance),tenengrad:Math.round(sobelSq/samples),noise:Math.round(noise*10)/10,noiseLabel:noise>=18?'Didelis':noise>=10?'Vidutinis':'Nedidelis',blockiness:Math.round((blockN?blockSum/blockN:0)*10)/10,clipping:Math.round(clipping*10)/10,exposure:mean<48?'Tamsoka':mean>210?'Per šviesi':'Subalansuota',weakCount,goodCount,textureCoverage:Math.round(textureCoverage),sharpness};
 }
 
-function buildQualitySummary(metrics, visual, models) {
-  const successful = models.filter(m => Number.isFinite(m.normalizedScore));
-  const aiMean = successful.length ? successful.reduce((sum, m) => sum + m.normalizedScore, 0) / successful.length : null;
-  const aiSignal = aiMean == null ? 'AI vertinimas nepasiekiamas arba nepakanka kalibruotų modelių rezultatų' :
-    aiMean >= 7.5 ? 'AI modeliai bendrai palankiai įvertino vaizdo kokybę' :
-    aiMean >= 5 ? 'AI modelių vertinimas mišrus: kokybė vidutinė' :
-    'AI modeliai aptiko didesnę suvokiamos kokybės riziką';
-  const risks = [];
-  if (visual.blur === 'Padidėjusi') risks.push('galimas susiliejimas');
-  if (visual.noise === 'Didelis') risks.push('ryškus vaizdo triukšmas');
-  if (visual.exposure !== 'Subalansuota') risks.push(`ekspozicija: ${visual.exposure.toLowerCase()}`);
-  if (metrics.ratio < 0.8) risks.push('raiška mažesnė už rekomenduojamą');
-  const verdict = metrics.rating.score >= 7 && risks.length === 0
-    ? 'Kadrą galima rekomenduoti spaudai pagal apskaičiuotą raišką ir atliktus vaizdo patikrinimus.'
-    : metrics.rating.score >= 5
-      ? `Spauda galima, tačiau prieš gamybą įvertinkite rizikas: ${risks.join(', ') || 'kokybės atsarga nedidelė'}.`
-      : `Šiam spaudos dydžiui kadras rizikingas: ${risks.join(', ') || 'nepakankama raiška'}.`;
-  return { aiSignal, verdict, aiMean: aiMean == null ? null : Math.round(aiMean * 10) / 10, risks };
+function buildQualitySummary(metrics,visual){
+  const resolution=metrics.ratio>=1?'Pakankama':metrics.ratio>=.7?'Ribinė':'Nepakankama';
+  const risks=[];if(metrics.ratio<1)risks.push('nepakankama spaudos raiška');if(visual.weakCount>=10)risks.push('silpnas detalumas dalyje kadro');if(visual.noiseLabel==='Didelis')risks.push('didelis triukšmas');if(visual.clipping>8)risks.push('prarastos šviesios arba tamsios detalės');
+  const verdict=visual.textureCoverage<12?'Ryškumo patikimumo nustatyti nepavyko: kadre per mažai tekstūros. Raiška įvertinta atskirai.':risks.length?`Spaudai yra kokybės rizikų: ${risks.join(', ')}.`:'Pagal išmatuotą raišką ir vaizdo signalus ryškių perspėjimo požymių nenustatyta. Rekomenduojamas bandomasis spaudinys.';
+  return {resolution,verdict,detail:visual.textureCoverage<12?'Nepakanka tekstūros patikimam ryškumo įvertinimui':`${visual.goodCount} iš 64 zonų turi stipresnį detalumo signalą; ${visual.weakCount} zonų pažymėtos kaip silpnesnės.`};
 }
 
 function calculatePrintRating(dpi, targetDpi, weakTiles) {
@@ -520,9 +410,9 @@ function App() {
   const [qualityStatus, setQualityStatus] = useState('idle');
   const [qualityProgress, setQualityProgress] = useState('');
   const [qualityResult, setQualityResult] = useState(null);
+  const [qualityOverlayVisible, setQualityOverlayVisible] = useState(true);
   const [qualityCropZoom, setQualityCropZoom] = useState(1);
   const [qualityPan, setQualityPan] = useState({ x: 0, y: 0 });
-  const [selectedIqaModels] = useState(['dbcnn', 'musiq']);
   const qualityFileRef = useRef(null);
   const qualityDragRef = useRef(null);
   const qualityPreviewRef = useRef(null);
@@ -885,45 +775,26 @@ function App() {
   }, [qualityImage, qualityDimensions, qualityCropZoom, qualityPan, qualityRotation, qualityScale]);
 
   const runQualityAnalysis = async () => {
-    if (!qualityImage || qualityStatus === 'running' || !selectedIqaModels.length) return;
-    setQualityStatus('loading'); setQualityProgress('Paruošiamas apkirptas spaudos kadras…');
+    if (!qualityImage || ['loading','running'].includes(qualityStatus)) return;
+    setQualityStatus('running');
+    setQualityProgress('Analizuojamas galutinis apkirptas kadras matematiniais metodais…');
     try {
-      const cropCanvas = makeQualityCrop();
-      const croppedImage = await new Promise((resolve,reject)=>cropCanvas.toBlob(async blob=>{ if(!blob) return reject(new Error('Nepavyko paruošti apkirpto vaizdo.')); try { const decoded=await blobToImage(blob); resolve(decoded.image); } catch(e){reject(e);} },'image/png'));
-      const results = [];
-      for (let i=0;i<selectedIqaModels.length;i++) {
-        const id=selectedIqaModels[i], cfg=IQA_MODELS[id];
-        setQualityStatus('running');
-        setQualityProgress(`${cfg.label}: ${i+1}/${selectedIqaModels.length}. Modelio paruošimas / atsisiuntimas…`);
-        let session;
-        try {
-          session=await loadIqaModel(id,(part,value)=>setQualityProgress(`${cfg.label}: ${part==='model'?'modelis':'svoriai'} ${value==null?'atsisiunčiami':value+'%'}`));
-          setQualityProgress(`${cfg.label}: analizuojamas APKIRPTAS kadras…`);
-          const tensor=imageToIqaTensor(croppedImage,id);
-          const output=await session.run({[session.inputNames[0]]:tensor});
-          const raw=readIqaScore(output,session);
-          results.push({id,label:cfg.label,score:raw,normalizedScore:normalizeIqaScore(id,raw)});
-        } catch (modelError) {
-          console.error(`${cfg.label} nepavyko:`, modelError);
-          results.push({id,label:cfg.label,error:modelError.message || 'Nežinoma modelio klaida'});
-        } finally {
-          if (session) {
-            try { await session.release(); } catch (releaseError) { console.warn('Nepavyko atlaisvinti AI sesijos:', releaseError); }
-          }
-        }
-      }
-      const grid=calculateSharpnessGrid(croppedImage);
+      const cropCanvas=makeQualityCrop();
+      const croppedImage=await new Promise((resolve,reject)=>cropCanvas.toBlob(async blob=>{
+        if(!blob)return reject(new Error('Nepavyko paruošti apkirpto vaizdo.'));
+        try{const decoded=await blobToImage(blob);resolve(decoded.image);}catch(e){reject(e);}
+      },'image/png'));
       const visual=analyzeCropVisualMetrics(croppedImage);
       const [wCm,hCm]=qualityDimensions;
-      const dpiX=cropCanvas.width/(wCm/2.54), dpiY=cropCanvas.height/(hCm/2.54);
-      const weakTiles = grid.filter(t=>t.weak).length;
-      const targetDpi = getTargetDpi(Math.max(wCm,hCm), qualityScale);
-      const rating = calculatePrintRating(Math.min(dpiX,dpiY), targetDpi, weakTiles);
-      const summaryMetrics = { dpi: Math.round(Math.min(dpiX,dpiY)), targetDpi: Math.round(targetDpi), ratio: Math.min(dpiX,dpiY)/targetDpi, rating };
-      const summary = buildQualitySummary(summaryMetrics, visual, results);
-      setQualityResult({models:results,grid,dpiX,dpiY,width:cropCanvas.width,height:cropCanvas.height,weakTiles,targetDpi,rating,visual,summary,analyzedAt:new Date().toISOString()});
-      setQualityStatus(results.some(r=>!r.error) ? 'done' : 'error'); setQualityProgress(results.some(r=>r.error) ? `Analizė baigta iš dalies: ${results.filter(r=>!r.error).length}/${results.length} modelių pavyko. Klaidos pateiktos prie modelių.` : 'Analizė baigta. Visi pasirinkti modeliai vertino tik apkirptą spaudos kadrą.');
-    } catch(error) { console.error('IQA analysis error:',error); setQualityStatus('error'); setQualityProgress(`AI analizė nepavyko: ${error.message||'nežinoma klaida'}`); }
+      const dpiX=cropCanvas.width/(wCm/2.54),dpiY=cropCanvas.height/(hCm/2.54);
+      const targetDpi=getTargetDpi(Math.max(wCm,hCm),qualityScale);
+      const weakTiles=visual.weakCount;
+      const rating=calculatePrintRating(Math.min(dpiX,dpiY),targetDpi,0);
+      const summary=buildQualitySummary({ratio:Math.min(dpiX,dpiY)/targetDpi,rating},visual);
+      setQualityResult({grid:visual.grid,dpiX,dpiY,width:cropCanvas.width,height:cropCanvas.height,weakTiles,targetDpi,rating,visual,summary,analyzedAt:new Date().toISOString()});
+      setQualityStatus('done');
+      setQualityProgress('Analizė baigta. Naudoti matematiniai vaizdo analizės metodai. AI modeliai nebuvo paleisti.');
+    }catch(error){console.error('Matematinė analizė nepavyko:',error);setQualityStatus('error');setQualityProgress(`Analizė nepavyko: ${error.message||'nežinoma klaida'}`);}
   };
 
   const qualityFormats = qualityPrintType === 'wide' ? WIDE_FORMATS : FORMATS;
@@ -941,31 +812,40 @@ function App() {
       <div className="quality-step-title">3. KADRO KOREGAVIMAS</div>
       <div className="quality-edit-actions"><button className="secondary" onClick={() => setQualityRotation(r => (r + 270) % 360)} disabled={!qualityImage}><RotateCcw size={15}/> Pasukti kairėn</button><button className="secondary" onClick={() => setQualityRotation(r => (r + 90) % 360)} disabled={!qualityImage}><RotateCw size={15}/> Pasukti dešinėn</button></div>
       <button className="secondary quality-reset" onClick={() => {setQualityCropZoom(1);setQualityPan({x:0,y:0});setQualityRotation(0);setQualityResult(null);setQualityStatus('idle');}} disabled={!qualityImage}><RotateCcw size={15}/> Atkurti originalų vaizdą</button>
-      <small className="iqa-note">Tempkite nuotrauką peržiūros lange. AI ir skaičiavimai naudos tą patį apkirptą vaizdą.</small>
-      <div className="quality-step-title">4. KOKYBĖS ANALIZĖ</div>
-      <small className="iqa-note">Analizės modeliai parenkami automatiškai. Techniniai modelių pavadinimai nerodomi.</small>
-      <button className="primary quality-run" onClick={runQualityAnalysis} disabled={!qualityImage || !selectedIqaModels.length || ['loading','running'].includes(qualityStatus)}>{['loading','running'].includes(qualityStatus) ? <Loader2 className="spin" size={16}/> : <Sparkles size={16}/>} {qualityStatus === 'done' ? 'Analizuoti dar kartą' : 'Pradėti AI analizę'}</button>
-      <div className={`quality-progress ${qualityStatus}`}>{qualityProgress || 'AI analizė vyksta šiame įrenginyje. Pirmą kartą modeliai atsisiunčiami.'}</div>
+      <small className="iqa-note">Tempkite nuotrauką peržiūros lange. Analizuojamas tiksliai matomas apkirptas kadras.</small>
+      <div className="quality-step-title">4. MATEMATINĖ KOKYBĖS ANALIZĖ</div>
+      <small className="iqa-note">AI modeliai pašalinti. Tikrinama raiška, detalumas, kraštų aiškumas, triukšmas ir vaizdo artefaktai.</small>
+      <button className="primary quality-run" onClick={runQualityAnalysis} disabled={!qualityImage || ['loading','running'].includes(qualityStatus)}>{['loading','running'].includes(qualityStatus) ? <Loader2 className="spin" size={16}/> : <Sparkles size={16}/>} {qualityStatus === 'done' ? 'Analizuoti dar kartą' : 'Pradėti kokybės analizę'}</button>
+      <div className={`quality-progress ${qualityStatus}`}>{qualityProgress || 'Analizė atliekama šiame įrenginyje, be AI modelių ir be interneto.'}</div>
     </section>
     <section className="quality-preview-panel">
       <div className="quality-preview-heading"><div><b>Galutinis apkirptas spaudos kadras</b><span>Tempkite nuotrauką pele arba pirštu. Rėmelio proporcijos atitinka pasirinktą formatą.</span></div><span className="quality-format-chip">{qualityDimensions[0]} × {qualityDimensions[1]} cm</span></div>
-      <div className="quality-preview-stage quality-preview-stage-new">{qualityImage ? <div className="quality-canvas-frame" style={{aspectRatio:`${qualityDimensions[0]}/${qualityDimensions[1]}`,width:`min(100%, ${Math.min(900, Math.max(280, (qualityDimensions[0]/qualityDimensions[1])*(window.innerHeight-470)))}px)`,height:`min(calc(100vh - 470px), ${Math.min(760, Math.max(220, (qualityDimensions[1]/qualityDimensions[0])*900))}px)`}} onPointerDown={startQualityPan} onPointerMove={moveQualityPan} onPointerUp={stopQualityPan} onPointerCancel={stopQualityPan} onWheel={handleQualityWheel}><canvas ref={qualityPreviewRef} aria-label="Apkirpto kadro peržiūra"/><div className="quality-crop-guides"><i/><i/><i/><i/></div>{qualityResult && <div className="quality-grid-overlay">{qualityResult.grid.map(tile=><div key={`${tile.x}-${tile.y}`} className={tile.weak?'weak':''} style={{left:`${tile.x*33.333}%`,top:`${tile.y*33.333}%`,width:'33.333%',height:'33.333%'}}>{tile.weak&&<span>Silpnesnė detalumo sritis</span>}</div>)}</div>}<div className="quality-zoom-overlay" onPointerDown={e=>e.stopPropagation()}><button type="button" aria-label="Atitolinti" disabled={qualityCropZoom<=1} onClick={()=>{setQualityCropZoom(z=>Math.max(1,+(z-.15).toFixed(2)));setQualityResult(null);setQualityStatus('idle');}}>−</button><span>{Math.round(qualityCropZoom*100)}%</span><button type="button" aria-label="Priartinti" disabled={qualityCropZoom>=4} onClick={()=>{setQualityCropZoom(z=>Math.min(4,+(z+.15).toFixed(2)));setQualityResult(null);setQualityStatus('idle');}}>+</button></div></div> : <div className="empty-stage"><Images size={48}/><b>Įkelkite nuotrauką</b><span>Pasirinkite spaudos formatą, apkirpkite ir įvertinkite konkretų kadrą.</span><button className="primary" onClick={()=>qualityFileRef.current?.click()}><ImagePlus size={17}/> Įkelti originalą</button></div>}</div>
+      <div className="quality-preview-stage quality-preview-stage-new">{qualityImage ? <div className="quality-canvas-frame" style={{aspectRatio:`${qualityDimensions[0]}/${qualityDimensions[1]}`,width:`min(100%, ${Math.min(900, Math.max(280, (qualityDimensions[0]/qualityDimensions[1])*(window.innerHeight-470)))}px)`,height:`min(calc(100vh - 470px), ${Math.min(760, Math.max(220, (qualityDimensions[1]/qualityDimensions[0])*900))}px)`}} onPointerDown={startQualityPan} onPointerMove={moveQualityPan} onPointerUp={stopQualityPan} onPointerCancel={stopQualityPan} onWheel={handleQualityWheel}><canvas ref={qualityPreviewRef} aria-label="Apkirpto kadro peržiūra"/><div className="quality-crop-guides"><i/><i/><i/><i/></div>{qualityResult && qualityOverlayVisible && <div className="quality-grid-overlay quality-grid-overlay-8">{qualityResult.grid.map(tile=><div key={`${tile.x}-${tile.y}`} className={`zone-${tile.status}`} style={{left:`${tile.x*12.5}%`,top:`${tile.y*12.5}%`,width:'12.5%',height:'12.5%'}} title={tile.status==='weak'?'Silpnesnis detalumo signalas':tile.status==='good'?'Stipresnis detalumo signalas':'Neutrali / mažai tekstūros zona'}/>)}</div>}<div className="quality-zoom-overlay" onPointerDown={e=>e.stopPropagation()}><button type="button" aria-label="Atitolinti" disabled={qualityCropZoom<=1} onClick={()=>{setQualityCropZoom(z=>Math.max(1,+(z-.15).toFixed(2)));setQualityResult(null);setQualityStatus('idle');}}>−</button><span>{Math.round(qualityCropZoom*100)}%</span><button type="button" aria-label="Priartinti" disabled={qualityCropZoom>=4} onClick={()=>{setQualityCropZoom(z=>Math.min(4,+(z+.15).toFixed(2)));setQualityResult(null);setQualityStatus('idle');}}>+</button></div></div> : <div className="empty-stage"><Images size={48}/><b>Įkelkite nuotrauką</b><span>Pasirinkite spaudos formatą, apkirpkite ir įvertinkite konkretų kadrą.</span><button className="primary" onClick={()=>qualityFileRef.current?.click()}><ImagePlus size={17}/> Įkelti originalą</button></div>}</div>
       {qualityLiveMetrics && <div className="quality-live-metrics"><div><small>Apkirpto kadro dydis</small><b>{qualityLiveMetrics.width.toLocaleString('lt-LT')} × {qualityLiveMetrics.height.toLocaleString('lt-LT')} px</b></div><div><small>Efektyvi raiška</small><b>{Math.round(Math.min(qualityLiveMetrics.dpiX,qualityLiveMetrics.dpiY))} DPI</b></div><div><small>Rekomenduojama šiam dydžiui</small><b>{Math.round(qualityLiveMetrics.targetDpi)} DPI</b></div><div><small>Raiškos santykis</small><b>{Math.round(qualityLiveMetrics.ratio*100)}%</b></div></div>}
-      {qualityLiveMetrics && <div className="print-rating-panel quality-rating-live"><div className="print-rating-main"><small>PRELIMINARUS SPAUDOS ĮVERTINIMAS</small><div><strong>{qualityLiveMetrics.rating.score.toLocaleString('lt-LT')}</strong><span>/ 10</span></div><b>{qualityLiveMetrics.rating.label}</b></div><div className="print-rating-details"><div><span>Raiškos balas</span><b>{qualityLiveMetrics.rating.resolutionScore} / 10</b><small>{Math.round(qualityLiveMetrics.ratio*100)}% nuo rekomenduojamo DPI</small></div><div><span>Matematinis pagrindas</span><b>{qualityLiveMetrics.width} × {qualityLiveMetrics.height} px</b><small>Apkirpto kadro pikseliai ÷ spaudos dydis coliais</small></div><div><span>AI analizė</span><b>{qualityResult ? `${qualityResult.models.filter(m=>!m.error).length}/${qualityResult.models.length} modeliai` : 'Dar neatlikta'}</b><small>AI rezultatai neįtraukiami į DPI balą</small></div></div><p className="print-rating-explanation">Balas perskaičiuojamas iš karto pakeitus formatą arba kadrą. Formulė: apkirpto kadro pikseliai ÷ spaudos kraštinė coliais = DPI; tada DPI lyginamas su rekomenduojamu tikslu. 100% tikslo atitinka 7/10, 125% – 9/10, 150% – 10/10. Tai raiškos tinkamumo įvertinimas, ne pažadas, kad nuotrauka bus idealiai ryški.</p></div>}
+      {qualityLiveMetrics && <div className="print-rating-panel quality-rating-live"><div className="print-rating-main"><small>RAIŠKOS TINKAMUMO ĮVERTINIMAS</small><div><strong>{qualityLiveMetrics.rating.score.toLocaleString('lt-LT')}</strong><span>/ 10</span></div><b>{qualityLiveMetrics.rating.label}</b></div><div className="print-rating-details"><div><span>Raiškos balas</span><b>{qualityLiveMetrics.rating.resolutionScore} / 10</b><small>{Math.round(qualityLiveMetrics.ratio*100)}% nuo rekomenduojamo DPI</small></div><div><span>Matematinis pagrindas</span><b>{qualityLiveMetrics.width} × {qualityLiveMetrics.height} px</b><small>Apkirpto kadro pikseliai ÷ spaudos dydis coliais</small></div><div><span>Vaizdo analizė</span><b>{qualityResult ? 'Atlikta' : 'Dar neatlikta'}</b><small>Matematiniai matavimai, be AI modelių</small></div></div><p className="print-rating-explanation">Raiškos balas perskaičiuojamas iš karto pakeitus formatą arba kadrą. Formulė: apkirpto kadro pikseliai ÷ spaudos kraštinė coliais = DPI; tada DPI lyginamas su rekomenduojamu tikslu. 100% tikslo atitinka 7/10, 125% – 9/10, 150% – 10/10. Tai raiškos tinkamumo įvertinimas, ne pažadas, kad nuotrauka bus idealiai ryški.</p></div>}
       {qualityResult && <section className="quality-summary-card">
-        <div className="quality-summary-heading"><div><small>NUOTRAUKOS KOKYBĖS SANTRAUKA</small><h3>Apkirpto kadro įvertinimas</h3></div><span className="quality-summary-status">{qualityResult.summary.verdict.startsWith('Kadrą galima') ? 'Tinkama' : qualityResult.summary.verdict.startsWith('Spauda galima') ? 'Su pastabomis' : 'Rizikinga'}</span></div>
+        <div className="quality-summary-heading"><div><small>MATEMATINĖS ANALIZĖS SANTRAUKA</small><h3>Apkirpto kadro rezultatai</h3></div><span className="quality-summary-status">{qualityResult.summary.resolution}</span></div>
         <div className="quality-summary-grid">
-          <div><small>Spaudos tinkamumas</small><b>{qualityResult.rating.score.toLocaleString('lt-LT')} / 10</b></div>
-          <div><small>Raiška</small><b>{Math.round(Math.min(qualityResult.dpiX,qualityResult.dpiY))} DPI</b><span>Rekomenduojama {Math.round(qualityResult.targetDpi)} DPI</span></div>
-          <div><small>Ryškumas</small><b>{qualityResult.visual.sharpness}</b><span>{qualityResult.visual.blur} susiliejimo rizika</span></div>
-          <div><small>Triukšmas</small><b>{qualityResult.visual.noise}</b><span>Orientacinis vaizdo matas</span></div>
-          <div><small>Ekspozicija</small><b>{qualityResult.visual.exposure}</b><span>{qualityResult.visual.clipped}</span></div>
-          <div><small>AI išvada</small><b>{qualityResult.summary.aiMean == null ? 'Nėra kalibruoto balo' : `${qualityResult.summary.aiMean.toLocaleString('lt-LT')} / 10`}</b><span>{qualityResult.summary.aiSignal}</span></div>
+          <div><small>Spaudos raiška</small><b>{Math.round(Math.min(qualityResult.dpiX,qualityResult.dpiY))} DPI</b><span>Tikslas {Math.round(qualityResult.targetDpi)} DPI · {qualityResult.summary.resolution.toLowerCase()}</span></div>
+          <div><small>Detalumo / ryškumo signalas</small><b>{qualityResult.visual.sharpness}</b><span>{qualityResult.summary.detail}</span></div>
+          <div><small>Laplacian Variance</small><b>{qualityResult.visual.lapVariance.toLocaleString('lt-LT')}</b><span>Gretimų pikselių šviesumo pokyčių dispersija</span></div>
+          <div><small>Tenengrad</small><b>{qualityResult.visual.tenengrad.toLocaleString('lt-LT')}</b><span>Sobel kraštų stiprumo matas</span></div>
+          <div><small>Triukšmo indikatorius</small><b>{qualityResult.visual.noiseLabel}</b><span>Matavimas: {qualityResult.visual.noise}</span></div>
+          <div><small>JPEG blokų indikatorius</small><b>{qualityResult.visual.blockiness}</b><span>Gretimų pikselių skirtumai ties 8 px ribomis</span></div>
+          <div><small>Silpnos / stiprios zonos</small><b>{qualityResult.visual.weakCount} / {qualityResult.visual.goodCount}</b><span>Iš 64 analizuotų sričių</span></div>
+          <div><small>Ekspozicija / kontrastas</small><b>{qualityResult.visual.exposure}</b><span>Kontrastas: {qualityResult.visual.contrast} · išdegimas: {qualityResult.visual.clipping}%</span></div>
         </div>
         <p className="quality-summary-verdict"><b>Galutinė išvada:</b> {qualityResult.summary.verdict}</p>
-        <p className="quality-summary-footnote">Vertinama tiksliai ta apkirpta nuotrauka, kuri buvo perduota analizei. DPI apskaičiuojamas matematiškai. Ryškumo, triukšmo ir ekspozicijos rodikliai yra automatiniai vaizdo signalų įverčiai, o ne laboratorinis matavimas.</p>
+        <div className="quality-score-explanation"><b>Kaip sudaryti rezultatai?</b><ul>
+          <li><b>Raiška:</b> apkirpto kadro pikseliai dalijami iš pasirinkto spaudos dydžio coliais.</li>
+          <li><b>Laplacian Variance:</b> matuoja gretimų pikselių šviesumo pokyčių dispersiją.</li>
+          <li><b>Tenengrad:</b> Sobel operatoriumi matuoja kraštų stiprumą.</li>
+          <li><b>64 zonos:</b> kadras padalijamas į 8 × 8 dalis. Raudona žymi gerokai silpnesnį detalumo signalą, žalia – stipresnį signalą, lyginant su tekstūrinėmis šios nuotraukos zonomis.</li>
+          <li><b>Triukšmas ir blokai:</b> pateikiami kaip indikatoriai, ne absoliutus kameros ar JPEG kokybės matavimas.</li>
+        </ul></div>
+        <p className="quality-summary-footnote">FFT atskiro skaičiavimo šiame etape dar nėra. Tai matematiniai indikatoriai, o ne laboratorinis fokusavimo matavimas. Lygios sritys, pavyzdžiui, dangus, nebaudžiamos vien dėl mažo detalių kiekio.</p>
       </section>}
-      {qualityResult && <div className="quality-ai-results"><div className="quality-ai-results-heading"><b>AI ANALIZĖS REZULTATAI</b><span>Rodoma čia, iškart po kadro ir DPI įvertinimo. Modelių balai atskiri nuo spaudos tinkamumo.</span></div><div className="quality-results">{qualityResult.models.map(m=><div className={`quality-result-card ${m.error?'quality-result-error':''}`} key={m.id}><small>{m.label} · modelio rezultatas</small>{m.error?<b>Klaida</b>:<><b>{m.normalizedScore == null ? 'Nekalibruota skalė' : `${m.normalizedScore.toFixed(1)} / 10`}</b><span className="quality-raw-score">Neapdorotas rezultatas: {Number(m.score).toFixed(4)}</span></>}<span>{m.error|| (m.normalizedScore == null ? 'Šio modelio dokumentacijoje nėra patikimos skaitinės ribos, todėl jo neperverčiame į tariamai tikslų 1–10 balą.' : 'Orientacinis modelio skalės perskaičiavimas į 1–10. Tai nėra spaudos DPI įvertinimas.')}</span></div>)}</div><div className="quality-disclaimer"><AlertTriangle size={15}/> AI modelių prognozės priklauso nuo jų mokymo duomenų ir atskiros skalės. Bendras spaudos balas apskaičiuojamas atskirai pagal apkirpto kadro realią raišką.</div></div>}
+      {qualityResult && <div className="quality-overlay-toggle"><label><input type="checkbox" checked={qualityOverlayVisible} onChange={e=>setQualityOverlayVisible(e.target.checked)}/> Rodyti žalias ir raudonas zonas ant nuotraukos</label><span>64 zonos · 8 × 8</span></div>}
     </section>
     <input ref={qualityFileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,image/*" hidden onChange={e=>{loadQualityImage(e.target.files?.[0]);e.target.value='';}}/>
   </main>;
