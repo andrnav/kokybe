@@ -5,7 +5,7 @@ import { heicTo } from 'heic-to';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import * as UTIF from 'utif';
-import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2, Sparkles, BrainCircuit, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2, Sparkles, BrainCircuit, AlertTriangle, CheckCircle2, RotateCw } from 'lucide-react';
 import * as ort from 'onnxruntime-web';
 import './style.css';
 
@@ -25,6 +25,14 @@ const FORMATS = [
   { id: '30x40', label: '30 × 40 cm', ratioLabel: '30,5 × 40 cm', cm: [30.5, 40] },
   { id: 'a3', label: 'A3', ratioLabel: '29,7 × 42 cm', cm: [29.7, 42] },
   { id: '30x45', label: '30 × 45 cm', ratioLabel: '30,5 × 45 cm', cm: [30.5, 45] },
+];
+const WIDE_FORMATS = [
+  { id: '40x60', label: '40 × 60 cm', cm: [40, 60] },
+  { id: '60x90', label: '60 × 90 cm', cm: [60, 90] },
+  { id: '90x120', label: '90 × 120 cm', cm: [90, 120] },
+  { id: '100x150', label: '100 × 150 cm', cm: [100, 150] },
+  { id: '120x180', label: '120 × 180 cm', cm: [120, 180] },
+  { id: '150x200', label: '150 × 200 cm', cm: [150, 200] },
 ];
 const DEFAULT_QUALITY_SCALE = [
   { id: '10x15', label: '10 × 15 cm', size: 15, dpi: 200 },
@@ -386,6 +394,33 @@ function calculateSharpnessGrid(image) {
   return scores.map(s => ({ ...s, weak: median > 0 && s.score < median * 0.42 && s.edgeShare < 0.12 }));
 }
 
+function createOrientedCanvas(image, rotation = 0) {
+  const turns = ((Math.round(rotation / 90) % 4) + 4) % 4;
+  const swap = turns % 2 === 1;
+  const canvas = document.createElement('canvas');
+  canvas.width = swap ? image.naturalHeight : image.naturalWidth;
+  canvas.height = swap ? image.naturalWidth : image.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(turns * Math.PI / 2);
+  ctx.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
+  return canvas;
+}
+
+function getQualityCropGeometry(width, height, dimensions, zoom, pan) {
+  const ratio = dimensions[0] / dimensions[1];
+  let cropW = width, cropH = height;
+  if (width / height > ratio) cropW = height * ratio;
+  else cropH = width / ratio;
+  cropW /= clamp(zoom, 1, 4);
+  cropH /= clamp(zoom, 1, 4);
+  const maxX = Math.max(0, (width - cropW) / 2);
+  const maxY = Math.max(0, (height - cropH) / 2);
+  const cx = width / 2 + clamp(pan.x, -1, 1) * maxX;
+  const cy = height / 2 + clamp(pan.y, -1, 1) * maxY;
+  return { sx: clamp(cx - cropW / 2, 0, width - cropW), sy: clamp(cy - cropH / 2, 0, height - cropH), sw: cropW, sh: cropH, maxX, maxY };
+}
+
 function App() {
   const [photos, setPhotos] = useState([]);
   const [activeId, setActiveId] = useState(null);
@@ -403,6 +438,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('crop');
   const [qualityImage, setQualityImage] = useState(null);
   const [qualityDimensions, setQualityDimensions] = useState([10.2, 15.2]);
+  const [qualityRotation, setQualityRotation] = useState(0);
   const [qualityPrintType, setQualityPrintType] = useState('photo');
   const [qualityStatus, setQualityStatus] = useState('idle');
   const [qualityProgress, setQualityProgress] = useState('');
@@ -412,6 +448,7 @@ function App() {
   const [selectedIqaModels, setSelectedIqaModels] = useState(['dbcnn', 'musiq']);
   const qualityFileRef = useRef(null);
   const qualityDragRef = useRef(null);
+  const qualityPreviewRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
   const [resizeStart, setResizeStart] = useState(null);
@@ -703,54 +740,65 @@ function App() {
   const loadQualityImage = async file => {
     if (!file) return;
     if (!/^image\/(jpeg|png|webp|bmp|tiff?)$/i.test(file.type) && !/\.(jpe?g|png|webp|bmp|tif|tiff)$/i.test(file.name)) {
-      setMessage('Nuotraukų kokybės bandymui pasirink JPG, PNG, WEBP, BMP arba TIFF failą.'); return;
+      setMessage('Pasirinkite JPG, PNG, WEBP, BMP arba TIFF failą.'); return;
     }
     try {
       const decoded = await decodeFile(file);
       setQualityImage({ ...decoded, name: file.name });
-      setQualityCropZoom(1); setQualityPan({ x: 0, y: 0 });
+      setQualityCropZoom(1); setQualityPan({ x: 0, y: 0 }); setQualityRotation(0);
       setQualityResult(null); setQualityStatus('idle'); setQualityProgress('');
     } catch (error) { setMessage(`Nepavyko įkelti nuotraukos: ${error.message}`); }
   };
 
-  const startQualityPan = e => {
-    if (!qualityImage || qualityCropZoom <= 1) return;
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    qualityDragRef.current = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, pan: { ...qualityPan } };
-  };
-
-  const moveQualityPan = e => {
-    const drag = qualityDragRef.current;
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const travelX = rect.width * (qualityCropZoom - 1);
-    const travelY = rect.height * (qualityCropZoom - 1);
-    // Dragging the picture right reveals the left side of the source image.
-    const dx = travelX > 0 ? (e.clientX - drag.x) * 2 / travelX : 0;
-    const dy = travelY > 0 ? (e.clientY - drag.y) * 2 / travelY : 0;
-    setQualityPan({ x: clamp(drag.pan.x - dx, -1, 1), y: clamp(drag.pan.y - dy, -1, 1) });
-  };
-
-  const stopQualityPan = e => {
-    if (qualityDragRef.current?.pointerId === e.pointerId) qualityDragRef.current = null;
-  };
-
   const makeQualityCrop = () => {
     if (!qualityImage) return null;
-    const [a,b] = qualityDimensions;
-    const ratio = a / b;
-    const iw = qualityImage.width, ih = qualityImage.height;
-    let cw = iw, ch = ih;
-    if (iw / ih > ratio) cw = ih * ratio; else ch = iw / ratio;
-    cw /= qualityCropZoom; ch /= qualityCropZoom;
-    const maxX = Math.max(0, (iw-cw)/2), maxY = Math.max(0, (ih-ch)/2);
-    const cx = iw/2 + qualityPan.x*maxX, cy = ih/2 + qualityPan.y*maxY;
-    const sx = clamp(cx-cw/2,0,iw-cw), sy = clamp(cy-ch/2,0,ih-ch);
-    const canvas = document.createElement('canvas'); canvas.width=Math.max(1,Math.round(cw)); canvas.height=Math.max(1,Math.round(ch));
-    canvas.getContext('2d').drawImage(qualityImage.image,sx,sy,cw,ch,0,0,canvas.width,canvas.height);
+    const oriented = createOrientedCanvas(qualityImage.image, qualityRotation);
+    const crop = getQualityCropGeometry(oriented.width, oriented.height, qualityDimensions, qualityCropZoom, qualityPan);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(crop.sw)); canvas.height = Math.max(1, Math.round(crop.sh));
+    canvas.getContext('2d').drawImage(oriented, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
     return canvas;
   };
+
+  useEffect(() => {
+    if (!qualityImage || !qualityPreviewRef.current) return;
+    const cropCanvas = makeQualityCrop();
+    const preview = qualityPreviewRef.current;
+    preview.width = cropCanvas.width; preview.height = cropCanvas.height;
+    const ctx = preview.getContext('2d');
+    ctx.clearRect(0, 0, preview.width, preview.height); ctx.drawImage(cropCanvas, 0, 0);
+  }, [qualityImage, qualityDimensions, qualityCropZoom, qualityPan, qualityRotation]);
+
+  const startQualityPan = e => {
+    if (!qualityImage) return;
+    e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId);
+    qualityDragRef.current = { pointerId: e.pointerId, x: e.clientX, y: e.clientY, pan: { ...qualityPan } };
+  };
+  const moveQualityPan = e => {
+    const drag = qualityDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId || !qualityImage) return;
+    const oriented = createOrientedCanvas(qualityImage.image, qualityRotation);
+    const crop = getQualityCropGeometry(oriented.width, oriented.height, qualityDimensions, qualityCropZoom, drag.pan);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const scale = Math.min(rect.width / crop.sw, rect.height / crop.sh);
+    const dx = (e.clientX - drag.x) / Math.max(scale, 0.0001);
+    const dy = (e.clientY - drag.y) / Math.max(scale, 0.0001);
+    setQualityPan({ x: crop.maxX ? clamp(drag.pan.x - dx / crop.maxX, -1, 1) : 0, y: crop.maxY ? clamp(drag.pan.y - dy / crop.maxY, -1, 1) : 0 });
+  };
+  const stopQualityPan = e => { if (qualityDragRef.current?.pointerId === e.pointerId) qualityDragRef.current = null; };
+  const setQualityPrintTypeSafe = type => {
+    setQualityPrintType(type); setQualityDimensions(type === 'wide' ? [100, 150] : [10.2, 15.2]);
+    setQualityCropZoom(1); setQualityPan({ x: 0, y: 0 }); setQualityResult(null); setQualityStatus('idle');
+  };
+  const qualityLiveMetrics = useMemo(() => {
+    if (!qualityImage) return null;
+    const oriented = createOrientedCanvas(qualityImage.image, qualityRotation);
+    const crop = getQualityCropGeometry(oriented.width, oriented.height, qualityDimensions, qualityCropZoom, qualityPan);
+    const dpiX = crop.sw / (qualityDimensions[0] / 2.54), dpiY = crop.sh / (qualityDimensions[1] / 2.54);
+    const targetDpi = getTargetDpi(Math.max(...qualityDimensions), qualityScale);
+    const ratio = Math.min(dpiX, dpiY) / targetDpi;
+    return { width: Math.round(crop.sw), height: Math.round(crop.sh), dpiX, dpiY, targetDpi, ratio, rating: calculatePrintRating(Math.min(dpiX, dpiY), targetDpi, 0) };
+  }, [qualityImage, qualityDimensions, qualityCropZoom, qualityPan, qualityRotation, qualityScale]);
 
   const runQualityAnalysis = async () => {
     if (!qualityImage || qualityStatus === 'running' || !selectedIqaModels.length) return;
@@ -791,36 +839,38 @@ function App() {
     } catch(error) { console.error('IQA analysis error:',error); setQualityStatus('error'); setQualityProgress(`AI analizė nepavyko: ${error.message||'nežinoma klaida'}`); }
   };
 
-  const qualityTabView = <main className="quality-workspace">
+  const qualityFormats = qualityPrintType === 'wide' ? WIDE_FORMATS : FORMATS;
+  const qualityTabView = <main className="quality-workspace quality-workspace-rebuilt">
     <section className="quality-control-panel">
-      <div className="panel-title">1. Nuotrauka</div>
-      <button className="quality-upload" onClick={() => qualityFileRef.current?.click()}><ImagePlus size={19}/><span>{qualityImage ? 'Pakeisti nuotrauką' : 'Įkelti vieną nuotrauką'}</span></button>
-      {qualityImage && <div className="quality-file-name">{qualityImage.name}<small>{qualityImage.width.toLocaleString('lt-LT')} × {qualityImage.height.toLocaleString('lt-LT')} px</small></div>}
-      <div className="section-divider"/><div className="panel-title">2. Spaudos tipas</div>
-      <div className="quality-type-options"><button className={qualityPrintType === 'photo' ? 'selected' : ''} onClick={() => setQualityPrintType('photo')}>Foto spauda</button><button className={qualityPrintType === 'wide' ? 'selected' : ''} onClick={() => setQualityPrintType('wide')}>Platiaformatė spauda</button></div>
-      <div className="panel-title quality-subtitle">3. Spaudos matmenys (cm)</div>
-      {qualityPrintType === 'photo' && <div className="select-wrap"><select value={FORMATS.find(f => f.cm[0] === qualityDimensions[0] && f.cm[1] === qualityDimensions[1])?.id || 'custom'} onChange={e => { const f = FORMATS.find(x => x.id === e.target.value); if (f) setQualityDimensions([...f.cm]); }}>{FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}<option value="custom">Pagal skaičius</option></select></div>}
-      <div className="custom-format-fields quality-dimensions"><input type="number" min="1" max="300" step="0.1" value={qualityDimensions[0]} onChange={e => setQualityDimensions([Math.max(1, Number(e.target.value) || 1), qualityDimensions[1]])}/><span>×</span><input type="number" min="1" max="300" step="0.1" value={qualityDimensions[1]} onChange={e => setQualityDimensions([qualityDimensions[0], Math.max(1, Number(e.target.value) || 1)])}/></div>
-      <div className="section-divider"/><div className="panel-title">4. AI modeliai</div><div className="iqa-model-list">{Object.entries(IQA_MODELS).map(([id,m])=><label key={id}><input type="checkbox" checked={selectedIqaModels.includes(id)} onChange={e=>setSelectedIqaModels(prev=>e.target.checked?[...prev,id]:prev.filter(x=>x!==id))}/><span><b>{m.label}</b><small>{m.size}</small></span></label>)}</div><small className="iqa-note">Galima pasirinkti vieną arba kelis. Pasirinkus kelis, jie vykdomi paeiliui. Visų modelių atsisiuntimas gali viršyti 1 GB.</small><div className="panel-title quality-subtitle">5. Priartinimas</div><input type="range" min="1" max="3" step="0.05" value={qualityCropZoom} onChange={e=>setQualityCropZoom(Number(e.target.value))}/><small className="iqa-note">{Math.round(qualityCropZoom*100)}% · nuotrauką kadre stumkite pele arba pirštu</small>
-      <button className="primary quality-run" onClick={runQualityAnalysis} disabled={!qualityImage || !selectedIqaModels.length || ['loading','running'].includes(qualityStatus)}>{['loading','running'].includes(qualityStatus) ? <Loader2 className="spin" size={16}/> : <Sparkles size={16}/>} {qualityStatus === 'done' ? 'Analizuoti dar kartą' : 'Analizuoti nuotrauką'}</button>
-      <div className={`quality-progress ${qualityStatus}`}>{qualityProgress || 'Nuotrauka nebus siunčiama į serverį. Analizė vyksta šiame įrenginyje.'}</div>
+      <div className="quality-step-title">NUOTRAUKOS PARUOŠIMAS</div>
+      <button className="quality-upload" onClick={() => qualityFileRef.current?.click()}><ImagePlus size={19}/><span>{qualityImage ? 'Pakeisti originalią nuotrauką' : 'Įkelti nuotrauką'}</span></button>
+      {qualityImage && <div className="quality-file-name">{qualityImage.name}<small>Originalas: {qualityImage.width.toLocaleString('lt-LT')} × {qualityImage.height.toLocaleString('lt-LT')} px</small></div>}
+      <div className="quality-step-title">1. SPAUDOS TIPAS</div>
+      <div className="quality-type-options"><button className={qualityPrintType === 'photo' ? 'selected' : ''} onClick={() => setQualityPrintTypeSafe('photo')}>Foto spauda</button><button className={qualityPrintType === 'wide' ? 'selected' : ''} onClick={() => setQualityPrintTypeSafe('wide')}>Platiaformatė spauda</button></div>
+      <div className="quality-step-title">2. GALUTINIS SPAUDOS FORMATAS</div>
+      <div className="select-wrap"><select value={qualityFormats.find(f => f.cm[0] === qualityDimensions[0] && f.cm[1] === qualityDimensions[1])?.id || 'custom'} onChange={e => { const f = qualityFormats.find(x => x.id === e.target.value); if (f) { setQualityDimensions([...f.cm]); setQualityResult(null); setQualityStatus('idle'); setQualityCropZoom(1); setQualityPan({x:0,y:0}); } }}>{qualityFormats.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}<option value="custom">Individualūs matmenys</option></select></div>
+      <div className="custom-format-fields quality-dimensions"><input aria-label="Spaudos plotis centimetrais" type="number" min="1" max="300" step="0.1" value={qualityDimensions[0]} onChange={e => {setQualityDimensions([Math.max(1,Number(e.target.value)||1),qualityDimensions[1]]);setQualityResult(null);setQualityStatus('idle');}}/><span>×</span><input aria-label="Spaudos aukštis centimetrais" type="number" min="1" max="300" step="0.1" value={qualityDimensions[1]} onChange={e => {setQualityDimensions([qualityDimensions[0],Math.max(1,Number(e.target.value)||1)]);setQualityResult(null);setQualityStatus('idle');}}/><span>cm</span></div>
+      <button className="secondary quality-rotate-format" onClick={() => {setQualityDimensions(([a,b])=>[b,a]);setQualityResult(null);setQualityStatus('idle');}} disabled={!qualityImage}>Apversti spaudos formatą ↔</button>
+      <div className="quality-step-title">3. KADRO KOREGAVIMAS</div>
+      <div className="quality-edit-actions"><button className="secondary" onClick={() => setQualityRotation(r => (r + 270) % 360)} disabled={!qualityImage}><RotateCcw size={15}/> Pasukti kairėn</button><button className="secondary" onClick={() => setQualityRotation(r => (r + 90) % 360)} disabled={!qualityImage}><RotateCw size={15}/> Pasukti dešinėn</button></div>
+      <label className="quality-zoom-label">Priartinimas <b>{Math.round(qualityCropZoom*100)}%</b></label>
+      <input type="range" min="1" max="4" step="0.01" value={qualityCropZoom} disabled={!qualityImage} onChange={e=>{setQualityCropZoom(Number(e.target.value));setQualityResult(null);setQualityStatus('idle');}}/>
+      <button className="secondary quality-reset" onClick={() => {setQualityCropZoom(1);setQualityPan({x:0,y:0});setQualityRotation(0);setQualityResult(null);setQualityStatus('idle');}} disabled={!qualityImage}><RotateCcw size={15}/> Atkurti originalų vaizdą</button>
+      <small className="iqa-note">Tempkite nuotrauką peržiūros lange. AI ir skaičiavimai naudos tą patį apkirptą vaizdą.</small>
+      <div className="quality-step-title">4. AI MODELIAI</div>
+      <div className="iqa-model-list">{Object.entries(IQA_MODELS).map(([id,m])=><label key={id}><input type="checkbox" checked={selectedIqaModels.includes(id)} onChange={e=>setSelectedIqaModels(prev=>e.target.checked?[...prev,id]:prev.filter(x=>x!==id))}/><span><b>{m.label}</b><small>{m.size}</small></span></label>)}</div>
+      <small className="iqa-note">AI modelių prognozės rodomos atskirai. Jos nėra maišomos į matematinį DPI balą.</small>
+      <button className="primary quality-run" onClick={runQualityAnalysis} disabled={!qualityImage || !selectedIqaModels.length || ['loading','running'].includes(qualityStatus)}>{['loading','running'].includes(qualityStatus) ? <Loader2 className="spin" size={16}/> : <Sparkles size={16}/>} {qualityStatus === 'done' ? 'Analizuoti dar kartą' : 'Pradėti AI analizę'}</button>
+      <div className={`quality-progress ${qualityStatus}`}>{qualityProgress || 'AI analizė vyksta šiame įrenginyje. Pirmą kartą modeliai atsisiunčiami.'}</div>
     </section>
     <section className="quality-preview-panel">
-      <div className="quality-preview-heading"><div><b>Kadras, kuris bus siunčiamas AI analizei</b><span>Vilkite nuotrauką pele, kad pakeistumėte kadrą · priartinimą reguliuokite kairėje</span></div>{qualityResult && <span className="quality-score">{qualityResult.models.length} modeliai baigė</span>}</div>
-      <div className="quality-preview-stage">{qualityImage ? <div className="quality-image-wrap quality-crop-wrap" style={{aspectRatio:`${qualityDimensions[0]}/${qualityDimensions[1]}`}} onPointerDown={startQualityPan} onPointerMove={moveQualityPan} onPointerUp={stopQualityPan} onPointerCancel={stopQualityPan}><img src={qualityImage.url} alt="Apkirpimo peržiūra" draggable="false" style={{width:`${qualityCropZoom*100}%`,height:`${qualityCropZoom*100}%`,maxWidth:'none',maxHeight:'none',objectFit:'cover',transform:`translate(${-qualityPan.x*(qualityCropZoom-1)/(2*qualityCropZoom)*100}%,${-qualityPan.y*(qualityCropZoom-1)/(2*qualityCropZoom)*100}%)`}}/>{qualityResult && <div className="quality-grid-overlay">{qualityResult.grid.map(tile => <div key={`${tile.x}-${tile.y}`} className={tile.weak ? 'weak' : ''} style={{ left: `${tile.x * 33.333}%`, top: `${tile.y * 33.333}%`, width: '33.333%', height: '33.333%' }}>{tile.weak && <span>Galimas ryškumo trūkumas</span>}</div>)}</div>}</div> : <div className="empty-stage"><Images size={48}/><b>Įkelkite nuotrauką analizei</b><span>Šiame bandyme vertinsime vieną nuotrauką vienu metu.</span><button className="primary" onClick={() => qualityFileRef.current?.click()}><ImagePlus size={17}/> Įkelti nuotrauką</button></div>}</div>
-      {qualityResult && <><div className="print-rating-panel">
-        <div className="print-rating-main"><small>SPAUSDINIMO KOKYBĖ</small><div><strong>{qualityResult.rating.score.toLocaleString('lt-LT')}</strong><span>/ 10</span></div><b>{qualityResult.rating.label}</b></div>
-        <div className="print-rating-details">
-          <div><span>Apkirpto kadro raiška</span><b>{Math.round(Math.min(qualityResult.dpiX,qualityResult.dpiY))} DPI</b><small>Tikslas šiam formatui: {Math.round(qualityResult.targetDpi)} DPI</small></div>
-          <div><span>Raiškos įvertinimas</span><b>{qualityResult.rating.resolutionScore} / 10</b><small>{Math.round(qualityResult.rating.ratio*100)}% nuo rekomenduojamos raiškos</small></div>
-          <div><span>Galimos silpnesnės sritys</span><b>{qualityResult.weakTiles} iš 9</b><small>{qualityResult.rating.sharpnessPenalty ? `Balas sumažintas ${qualityResult.rating.sharpnessPenalty.toLocaleString('lt-LT')} dėl galimų silpnesnių sričių` : 'Ryškumo tinklelis nerado aiškių silpnų sričių'}</small></div>
-        </div>
-        <p className="print-rating-explanation">{qualityResult.rating.score >= 7.5 ? 'Pagal turimą raišką šis kadras turėtų tikti pasirinktam spaudos formatui.' : qualityResult.rating.score >= 5 ? 'Spausdinti galima, tačiau didesniame formate gali matytis detalumo trūkumas.' : 'Pasirinktam formatui raiškos gali nepakakti. Rekomenduojama mažesnė spauda arba aukštesnės raiškos originalas.'}</p>
-      </div>
-      <div className="quality-results">{qualityResult.models.map(m=><div className={`quality-result-card ${m.error ? 'quality-result-error' : ''}`} key={m.id}><small>{m.label} analizė</small><b>{m.error ? 'Nepavyko' : 'Atlikta'}</b><span>{m.error || 'Modelis išanalizavo apkirptą kadrą. Jo vidinis balas nenaudojamas bendram 1–10 įvertinimui, nes modelio skalė nėra kalibruota spaudos tinkamumui.'}</span></div>)}</div></>}
-      <div className="quality-disclaimer"><AlertTriangle size={15}/> 1–10 įvertinimas šiuo metu apskaičiuojamas pagal apkirpto kadro DPI ir galimų silpnesnių sričių indikatorių. AI modeliai pateikia papildomą nuomonę, tačiau jų neapdoroti balai nėra patikimai paverčiami į 1–10 be atskiro kalibravimo su realiomis spaudos nuotraukomis. Ryškumo tinklelis yra orientacinis, ne automatinis fokusavimo matavimas.</div>
+      <div className="quality-preview-heading"><div><b>Galutinis apkirptas spaudos kadras</b><span>Tempkite nuotrauką pele arba pirštu. Rėmelio proporcijos atitinka pasirinktą formatą.</span></div><span className="quality-format-chip">{qualityDimensions[0]} × {qualityDimensions[1]} cm</span></div>
+      <div className="quality-preview-stage quality-preview-stage-new">{qualityImage ? <div className="quality-canvas-frame" style={{aspectRatio:`${qualityDimensions[0]}/${qualityDimensions[1]}`}} onPointerDown={startQualityPan} onPointerMove={moveQualityPan} onPointerUp={stopQualityPan} onPointerCancel={stopQualityPan}><canvas ref={qualityPreviewRef} aria-label="Apkirpto kadro peržiūra"/><div className="quality-crop-guides"><i/><i/><i/><i/></div>{qualityResult && <div className="quality-grid-overlay">{qualityResult.grid.map(tile=><div key={`${tile.x}-${tile.y}`} className={tile.weak?'weak':''} style={{left:`${tile.x*33.333}%`,top:`${tile.y*33.333}%`,width:'33.333%',height:'33.333%'}}>{tile.weak&&<span>Silpnesnė detalumo sritis</span>}</div>)}</div>}</div> : <div className="empty-stage"><Images size={48}/><b>Įkelkite nuotrauką</b><span>Pasirinkite spaudos formatą, apkirpkite ir įvertinkite konkretų kadrą.</span><button className="primary" onClick={()=>qualityFileRef.current?.click()}><ImagePlus size={17}/> Įkelti originalą</button></div>}</div>
+      {qualityLiveMetrics && <div className="quality-live-metrics"><div><small>Apkirpto kadro dydis</small><b>{qualityLiveMetrics.width.toLocaleString('lt-LT')} × {qualityLiveMetrics.height.toLocaleString('lt-LT')} px</b></div><div><small>Efektyvi raiška</small><b>{Math.round(Math.min(qualityLiveMetrics.dpiX,qualityLiveMetrics.dpiY))} DPI</b></div><div><small>Rekomenduojama šiam dydžiui</small><b>{Math.round(qualityLiveMetrics.targetDpi)} DPI</b></div><div><small>Raiškos santykis</small><b>{Math.round(qualityLiveMetrics.ratio*100)}%</b></div></div>}
+      {qualityLiveMetrics && <div className="print-rating-panel quality-rating-live"><div className="print-rating-main"><small>PRELIMINARUS SPAUDOS ĮVERTINIMAS</small><div><strong>{qualityLiveMetrics.rating.score.toLocaleString('lt-LT')}</strong><span>/ 10</span></div><b>{qualityLiveMetrics.rating.label}</b></div><div className="print-rating-details"><div><span>Raiškos balas</span><b>{qualityLiveMetrics.rating.resolutionScore} / 10</b><small>{Math.round(qualityLiveMetrics.ratio*100)}% nuo rekomenduojamo DPI</small></div><div><span>Matematinis pagrindas</span><b>{qualityLiveMetrics.width} × {qualityLiveMetrics.height} px</b><small>Apkirpto kadro pikseliai ÷ spaudos dydis coliais</small></div><div><span>AI analizė</span><b>{qualityResult ? `${qualityResult.models.filter(m=>!m.error).length}/${qualityResult.models.length} modeliai` : 'Dar neatlikta'}</b><small>AI rezultatai neįtraukiami į DPI balą</small></div></div><p className="print-rating-explanation">Balas perskaičiuojamas iš karto pakeitus formatą arba kadrą. Formulė: apkirpto kadro pikseliai ÷ spaudos kraštinė coliais = DPI; tada DPI lyginamas su rekomenduojamu tikslu. 100% tikslo atitinka 7/10, 125% – 9/10, 150% – 10/10. Tai raiškos tinkamumo įvertinimas, ne pažadas, kad nuotrauka bus idealiai ryški.</p></div>}
+      {qualityResult && <div className="quality-ai-results"><div className="quality-ai-results-heading"><b>AI modelių atskiri rezultatai</b><span>Šie rezultatai nėra matematinis spaudos DPI balas.</span></div><div className="quality-results">{qualityResult.models.map(m=><div className={`quality-result-card ${m.error?'quality-result-error':''}`} key={m.id}><small>{m.label} · žalias modelio rezultatas</small><b>{m.error?'Klaida':Number(m.score).toFixed(4)}</b><span>{m.error||'Modelio prognozė konkrečiam apkirptam kadrui. Skirtingų modelių skaičių tarpusavyje tiesiogiai lyginti negalima.'}</span></div>)}</div><div className="quality-disclaimer"><AlertTriangle size={15}/> AI modelių prognozės priklauso nuo jų mokymo duomenų ir atskiros skalės. Bendras spaudos balas apskaičiuojamas atskirai pagal apkirpto kadro realią raišką.</div></div>}
     </section>
-    <input ref={qualityFileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,image/*" hidden onChange={e => { loadQualityImage(e.target.files?.[0]); e.target.value = ''; }}/>
+    <input ref={qualityFileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,image/*" hidden onChange={e=>{loadQualityImage(e.target.files?.[0]);e.target.value='';}}/>
   </main>;
 
   const currentFormatId = active?.format || format;
