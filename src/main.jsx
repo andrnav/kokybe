@@ -251,7 +251,7 @@ const KADRUOKLIS_DEFAULTS = {
   },
   sharp: { veryBlurry: 25, blurry: 80, sharp: 200 },
   noise: { moderate: 2.5, high: 4.5 },
-  exposure: { brightClipBad: 8, darkMean: 35, brightMean: 220 }
+  exposure: { brightClipBad: 8, darkMean: 35, brightMean: 220 }, aiBad: 0.30
 };
 
 function kadruoklisPercentile(values, q) {
@@ -326,7 +326,7 @@ function kadruoklisPrintContext(cmW,cmH,config=KADRUOKLIS_DEFAULTS) {
   return {printer,printerName:profile.name,nativeDpi:profile.nativeDpi,viewingCm,requiredDpi};
 }
 
-function evaluateKadruoklisQuality({dpi,cmW,cmH,metrics,config=KADRUOKLIS_DEFAULTS}) {
+function evaluateKadruoklisQuality({dpi,cmW,cmH,metrics,ai=null,config=KADRUOKLIS_DEFAULTS}) {
   const ctx=kadruoklisPrintContext(cmW,cmH,config),f=config.fractions;
   const sharpFactor=metrics?.sharp==null?1:metrics.sharp < config.sharp.veryBlurry ? 0.5 : metrics.sharp < config.sharp.blurry ? 0.75 : 1;
   const effectiveDpi=dpi*sharpFactor,ratio=effectiveDpi/ctx.requiredDpi;
@@ -342,9 +342,105 @@ function evaluateKadruoklisQuality({dpi,cmW,cmH,metrics,config=KADRUOKLIS_DEFAUL
     const e=metrics.exposure;
     if(e){const issues=[];if(e.bright>=config.exposure.brightClipBad)issues.push(`išdegę šviesūs plotai ${e.bright.toFixed(1)}%`);if(e.mean<=config.exposure.darkMean)issues.push('labai tamsus bendras vaizdas');if(e.mean>=config.exposure.brightMean)issues.push('labai šviesus bendras vaizdas');if(issues.length){penalty++;reasons.push({tone:'warn',text:`Ekspozicijos rizika: ${issues.join(', ')}.`});}else reasons.push({tone:'ok',text:`Ekspozicija normali (vidurkis ${Math.round(e.mean)}/255; tamsūs pikseliai ${e.dark.toFixed(1)}%).`});}
   }
+  if (ai) {
+    const bad=config.aiBad ?? 0.30;
+    const sharpAlready=metrics && metrics.sharp!=null && metrics.sharp<config.sharp.blurry;
+    const noiseAlready=metrics && metrics.noise!=null && metrics.noise>=config.noise.high;
+    let aiPenalty=0;
+    if(ai.sharp<bad && !sharpAlready){aiPenalty=1;reasons.push({tone:'warn',text:`CLIP AI mato neryškų vaizdą (ryškumo balas ${Math.round(ai.sharp*100)}%).`});}
+    if(ai.clean<bad && !noiseAlready){aiPenalty=1;reasons.push({tone:'warn',text:`CLIP AI mato triukšmą (švaros balas ${Math.round(ai.clean*100)}%).`});}
+    if(ai.quality<bad){aiPenalty=1;reasons.push({tone:'warn',text:`CLIP AI bendrą kokybę vertina žemai (${Math.round(ai.quality*100)}%).`});}
+    if(!aiPenalty)reasons.push({tone:'ok',text:`CLIP AI antra nuomonė: kokybė ${Math.round(ai.quality*100)}%, ryškumas ${Math.round(ai.sharp*100)}%, švara ${Math.round(ai.clean*100)}%.`});
+    penalty+=aiPenalty;
+  }
   const level=Math.max(1,resolutionLevel-Math.min(penalty,2));
   const labels={5:'Puiki',4:'Gera',3:'Tinka',2:'Ribinė',1:'Bloga'};
-  return {...ctx,level,label:labels[level],resolutionLevel,effectiveDpi,sharpFactor,ratio,penalty,reasons};
+  return {...ctx,level,label:labels[level],resolutionLevel,effectiveDpi,sharpFactor,ratio,penalty,reasons,ai:!!ai};
+}
+
+
+async function createClaudeClipAI(onStatus) {
+  const LIB_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
+  const MODEL = 'Xenova/clip-vit-base-patch16';
+  const LOGIT_SCALE = 100;
+  const PAIRS = {
+    quality: ['Good photo.', 'Bad photo.'],
+    sharp: ['Sharp photo.', 'Blurry photo.'],
+    clean: ['Clean photo.', 'Noisy photo.'],
+    bright: ['Bright photo.', 'Dark photo.'],
+    contrast: ['High contrast photo.', 'Low contrast photo.']
+  };
+  const KEYS = Object.keys(PAIRS);
+  const dot = (a,b) => { let v=0; for(let i=0;i<a.length;i++) v+=a[i]*b[i]; return v; };
+  const say=(text,pct)=>onStatus?.({text,pct});
+  say('Įkeliama Transformers.js biblioteka…',0);
+  const lib=await import(LIB_URL);
+  const {AutoTokenizer,CLIPTextModelWithProjection,AutoProcessor,CLIPVisionModelWithProjection}=lib;
+  const files={};
+  const progress=p=>{
+    if(p?.status==='progress' && p.file){
+      files[p.file]={loaded:p.loaded||0,total:p.total||0};
+      let l=0,t=0; for(const k in files){l+=files[k].loaded;t+=files[k].total;}
+      say(`Siunčiamas CLIP modelis: ${(l/1048576).toFixed(0)} / ${(t/1048576).toFixed(0)} MB`,t?Math.min(99,Math.round(l/t*100)):0);
+    }
+  };
+  const opts={dtype:'q8',device:'wasm',progress_callback:progress};
+  say('Siunčiamas tekstų modelis…',1);
+  const tokenizer=await AutoTokenizer.from_pretrained(MODEL,{progress_callback:progress});
+  const textModel=await CLIPTextModelWithProjection.from_pretrained(MODEL,opts);
+  say('Siunčiamas vaizdo modelis…',40);
+  const processor=await AutoProcessor.from_pretrained(MODEL,{progress_callback:progress});
+  const visionModel=await CLIPVisionModelWithProjection.from_pretrained(MODEL,opts);
+  say('Ruošiami kokybės aprašymai…',98);
+  const labels=[]; KEYS.forEach(k=>labels.push(...PAIRS[k]));
+  const inputs=tokenizer(labels,{padding:true,truncation:true});
+  const {text_embeds}=await textModel(inputs);
+  const all=text_embeds.normalize().tolist();
+  const textEmb={}; KEYS.forEach((k,i)=>textEmb[k]=[all[i*2],all[i*2+1]]);
+  say('CLIP paruoštas',100);
+  return {
+    model:MODEL,size:224,
+    async embed(rgba){
+      const image=new lib.RawImage(rgba,224,224,4);
+      const inputs=await processor(image);
+      const {image_embeds}=await visionModel(inputs);
+      return image_embeds.normalize().tolist()[0];
+    },
+    pairScores(emb){
+      const out={};
+      for(const k of KEYS){
+        const s1=LOGIT_SCALE*dot(textEmb[k][0],emb),s2=LOGIT_SCALE*dot(textEmb[k][1],emb);
+        out[k]=1/(1+Math.exp(s2-s1));
+      }
+      return out;
+    }
+  };
+}
+
+async function runClaudeClipOnCrop(ai, canvas, metrics) {
+  const N=224,W=canvas.width,H=canvas.height,side=Math.min(W,H);
+  const c=document.createElement('canvas');c.width=N;c.height=N;
+  const ctx=c.getContext('2d',{willReadFrequently:true});ctx.imageSmoothingQuality='high';
+  const views=[];
+  ctx.drawImage(canvas,(W-side)/2,(H-side)/2,side,side,0,0,N,N);
+  views.push({kind:'global',data:ctx.getImageData(0,0,N,N).data});
+  for(const patch of (metrics?.patches||[]).slice(0,4)){
+    const size=Math.min(N,W,H);
+    const sx=Math.max(0,Math.min(W-size,patch.x+(patch.size-size)/2));
+    const sy=Math.max(0,Math.min(H-size,patch.y+(patch.size-size)/2));
+    ctx.drawImage(canvas,sx,sy,size,size,0,0,N,N);
+    views.push({kind:'patch',data:ctx.getImageData(0,0,N,N).data});
+  }
+  c.width=c.height=0;
+  const per=[];
+  for(const v of views){
+    const emb=await ai.embed(new Uint8ClampedArray(v.data));
+    per.push({kind:v.kind,s:ai.pairScores(emb)});
+    await new Promise(resolve=>setTimeout(resolve,0));
+  }
+  const avg=(arr,key)=>arr.reduce((a,b)=>a+b.s[key],0)/arr.length;
+  const global=per.filter(x=>x.kind==='global'),patches=per.filter(x=>x.kind==='patch'),detail=patches.length?patches:global;
+  return {quality:avg(per,'quality'),sharp:avg(detail,'sharp'),clean:avg(detail,'clean'),bright:avg(global,'bright'),contrast:avg(global,'contrast'),n:per.length};
 }
 
 function calculateSharpnessGrid(image) {
@@ -868,13 +964,53 @@ function App() {
       const targetDpi=printContext.requiredDpi;
       const weakTiles=visual.weakCount;
       const rating=calculatePrintRating(Math.min(dpiX,dpiY),targetDpi,0);
-      const kadruoklisEvaluation=evaluateKadruoklisQuality({dpi:Math.min(dpiX,dpiY),cmW:wCm,cmH:hCm,metrics:kadruoklisMetrics,config:kadruoklisConfig});
+      const kadruoklisEvaluation=evaluateKadruoklisQuality({dpi:Math.min(dpiX,dpiY),cmW:wCm,cmH:hCm,metrics:kadruoklisMetrics,ai:qualityResult?.ai||null,config:kadruoklisConfig});
       const summary=buildQualitySummary({ratio:Math.min(dpiX,dpiY)/targetDpi,rating},visual);
       summary.verdict=`${kadruoklisEvaluation.label}. ${kadruoklisEvaluation.reasons.filter(r=>r.tone!=='ok').map(r=>r.text).join(' ') || 'Ryškių perspėjimo požymių nenustatyta.'}`;
-      setQualityResult({grid:visual.grid,dpiX,dpiY,width:cropCanvas.width,height:cropCanvas.height,weakTiles,targetDpi,rating,visual,summary,kadruoklisMetrics,kadruoklisEvaluation,analyzedAt:new Date().toISOString()});
+      setQualityResult({grid:visual.grid,dpiX,dpiY,width:cropCanvas.width,height:cropCanvas.height,weakTiles,targetDpi,rating,visual,summary,kadruoklisMetrics,kadruoklisEvaluation,ai:qualityResult?.ai||null,analyzedAt:new Date().toISOString()});
       setQualityStatus('done');
-      setQualityProgress('Analizė baigta. Naudoti matematiniai vaizdo analizės metodai. AI modeliai nebuvo paleisti.');
+      setQualityProgress('Analizė baigta. Naudoti matematiniai vaizdo analizės metodai. CLIP AI galima paleisti papildomai.');
     }catch(error){console.error('Matematinė analizė nepavyko:',error);setQualityStatus('error');setQualityProgress(`Analizė nepavyko: ${error.message||'nežinoma klaida'}`);}
+  };
+
+
+  const loadClipAI = async () => {
+    if (clipAI || clipAIStatus === 'loading') return;
+    setClipAIStatus('loading');
+    try {
+      const model = await createClaudeClipAI(st => setClipAIProgress(st.text));
+      setClipAI(model);
+      setClipAIStatus('ready');
+      setClipAIProgress('CLIP modelis paruoštas. Modelio failai išsaugomi naršyklės talpykloje.');
+    } catch (error) {
+      console.error('CLIP modelio įkėlimas nepavyko:',error);
+      setClipAIStatus('error');
+      setClipAIProgress(`Nepavyko įkelti CLIP: ${error.message || error}`);
+    }
+  };
+
+  const runClipAI = async () => {
+    if (!clipAI || !qualityImage || !qualityResult || clipAIStatus === 'running') return;
+    setClipAIStatus('running');
+    setClipAIProgress('CLIP vertina tiksliai apkirptą spaudos kadrą…');
+    try {
+      const cropCanvas=makeQualityCrop();
+      const metrics=qualityResult.kadruoklisMetrics || analyzeKadruoklisMetrics(cropCanvas);
+      const ai=await runClaudeClipOnCrop(clipAI,cropCanvas,metrics);
+      const evaluation=evaluateKadruoklisQuality({
+        dpi:Math.min(qualityResult.dpiX,qualityResult.dpiY),
+        cmW:qualityDimensions[0],cmH:qualityDimensions[1],
+        metrics,ai,config:kadruoklisConfig
+      });
+      const summary={...qualityResult.summary,verdict:`${evaluation.label}. ${evaluation.reasons.filter(r=>r.tone!=='ok').map(r=>r.text).join(' ') || 'CLIP AI ir matematinė analizė ryškių perspėjimų nerado.'}`};
+      setQualityResult(old=>({...old,ai,kadruoklisEvaluation:evaluation,summary}));
+      setClipAIStatus('ready');
+      setClipAIProgress(`CLIP analizė baigta. Įvertinti ${ai.n} vaizdo fragmentai.`);
+    } catch(error) {
+      console.error('CLIP analizė nepavyko:',error);
+      setClipAIStatus('error');
+      setClipAIProgress(`CLIP analizė nepavyko: ${error.message || error}`);
+    }
   };
 
   const qualityFormats = qualityPrintType === 'wide' ? WIDE_FORMATS : FORMATS;
@@ -894,9 +1030,14 @@ function App() {
       <button className="secondary quality-reset" onClick={() => {setQualityCropZoom(1);setQualityPan({x:0,y:0});setQualityRotation(0);setQualityResult(null);setQualityStatus('idle');}} disabled={!qualityImage}><RotateCcw size={15}/> Atkurti originalų vaizdą</button>
       <small className="iqa-note">Tempkite nuotrauką peržiūros lange. Analizuojamas tiksliai matomas apkirptas kadras.</small>
       <div className="quality-step-title">4. MATEMATINĖ KOKYBĖS ANALIZĖ</div>
-      <small className="iqa-note">AI modeliai pašalinti. Tikrinama raiška, detalumas, kraštų aiškumas, triukšmas ir vaizdo artefaktai.</small>
+      <small className="iqa-note">Pirmiausia atliekami matematiniai matavimai. Papildomai galima paleisti CLIP AI antrą nuomonę.</small>
       <button className="primary quality-run" onClick={runQualityAnalysis} disabled={!qualityImage || ['loading','running'].includes(qualityStatus)}>{['loading','running'].includes(qualityStatus) ? <Loader2 className="spin" size={16}/> : <Sparkles size={16}/>} {qualityStatus === 'done' ? 'Analizuoti dar kartą' : 'Pradėti kokybės analizę'}</button>
-      <div className={`quality-progress ${qualityStatus}`}>{qualityProgress || 'Analizė atliekama šiame įrenginyje, be AI modelių ir be interneto.'}</div>
+      <div className={`quality-progress ${qualityStatus}`}>{qualityProgress || 'Matematinė analizė veikia vietoje. CLIP AI pirmą kartą parsisiunčiamas atskirai.'}</div>
+      <div className="quality-step-title">5. CLIP AI ANTRA NUOMONĖ</div>
+      <small className="iqa-note">Claude projekto CLIP-ViT-B/16 modelis. Pirmą kartą reikia interneto ir apie 150 MB modelio failų. Nuotrauka apdorojama šiame įrenginyje ir niekur nesiunčiama.</small>
+      {!clipAI && <button className="secondary quality-run" onClick={loadClipAI} disabled={clipAIStatus==='loading'}>{clipAIStatus==='loading' ? <Loader2 className="spin" size={16}/> : <Sparkles size={16}/>} {clipAIStatus==='loading'?'Įkeliamas CLIP modelis…':'Atsisiųsti CLIP modelį'}</button>}
+      {clipAI && <button className="secondary quality-run" onClick={runClipAI} disabled={!qualityResult || clipAIStatus==='running'}>{clipAIStatus==='running'?<Loader2 className="spin" size={16}/>:<Sparkles size={16}/>} {clipAIStatus==='running'?'AI analizuoja…':'Analizuoti apkirptą kadrą su CLIP AI'}</button>}
+      <div className={`quality-progress ${clipAIStatus==='error'?'error':'idle'}`}>{clipAIProgress || 'CLIP AI yra pasirenkamas. Matematinė analizė veikia ir be jo.'}</div>
     </section>
     <section className="quality-preview-panel">
       <div className="quality-preview-heading"><div><b>Galutinis apkirptas spaudos kadras</b><span>Tempkite nuotrauką pele arba pirštu. Rėmelio proporcijos atitinka pasirinktą formatą.</span></div><span className="quality-format-chip">{qualityDimensions[0]} × {qualityDimensions[1]} cm</span></div>
@@ -908,6 +1049,7 @@ function App() {
         <div className="quality-summary-grid">
           <div><small>„Kadruoklis“ spaudos įvertinimas</small><b>{qualityResult.kadruoklisEvaluation.level}/5 · {qualityResult.kadruoklisEvaluation.label}</b><span>{qualityResult.kadruoklisEvaluation.printerName} · žiūrėjimo atstumas ~{Math.round(qualityResult.kadruoklisEvaluation.viewingCm)} cm</span></div>
           <div><small>Efektyvi raiška</small><b>{Math.round(qualityResult.kadruoklisEvaluation.effectiveDpi)} DPI</b><span>Reikia {Math.round(qualityResult.targetDpi)} DPI · ryškumo daugiklis {Math.round(qualityResult.kadruoklisEvaluation.sharpFactor*100)}%</span></div>
+          <div><small>CLIP AI kokybės įvertis</small><b>{qualityResult.ai ? `${Math.round(qualityResult.ai.quality*100)}%` : 'Neatlikta'}</b><span>{qualityResult.ai ? `Ryškumas ${Math.round(qualityResult.ai.sharp*100)}% · švara ${Math.round(qualityResult.ai.clean*100)}% · ${qualityResult.ai.n} fragmentai` : 'Galima paleisti papildomai, jei reikia antros nuomonės'}</span></div>
           <div><small>Detalumo / ryškumo signalas</small><b>{qualityResult.visual.sharpness}</b><span>{qualityResult.summary.detail}</span></div>
           <div><small>Laplacian Variance</small><b>{qualityResult.visual.lapVariance.toLocaleString('lt-LT')}</b><span>Gretimų pikselių šviesumo pokyčių dispersija</span></div>
           <div><small>Tenengrad</small><b>{qualityResult.visual.tenengrad.toLocaleString('lt-LT')}</b><span>Sobel kraštų stiprumo matas</span></div>
@@ -942,6 +1084,7 @@ function App() {
             <label>Labai šviesu, jei vidurkis daugiau<input type="number" min="0" max="255" value={kadruoklisConfig.exposure.brightMean} onChange={e=>setKadruoklisConfig(c=>({...c,exposure:{...c.exposure,brightMean:Math.max(0,Number(e.target.value)||220)}}))}/></label>
             <label>Neryški, jei Laplasas mažiau<input type="number" min="0" max="2000" value={kadruoklisConfig.sharp.blurry} onChange={e=>setKadruoklisConfig(c=>({...c,sharp:{...c.sharp,blurry:Math.max(0,Number(e.target.value)||0)}}))}/></label>
             <label>Didelis triukšmas nuo σ<input type="number" min="0" max="50" step=".1" value={kadruoklisConfig.noise.high} onChange={e=>setKadruoklisConfig(c=>({...c,noise:{...c.noise,high:Math.max(0,Number(e.target.value)||0)}}))}/></label>
+            <label>CLIP AI problemos riba<input type="number" min="0" max="1" step=".05" value={kadruoklisConfig.aiBad} onChange={e=>setKadruoklisConfig(c=>({...c,aiBad:Math.max(0,Math.min(1,Number(e.target.value)||.3))}))}/></label>
             <label>Išdegę šviesūs plotai nuo (%)<input type="number" min="0" max="100" step=".5" value={kadruoklisConfig.exposure.brightClipBad} onChange={e=>setKadruoklisConfig(c=>({...c,exposure:{...c.exposure,brightClipBad:Math.max(0,Number(e.target.value)||0)}}))}/></label>
           </div>
           <button className="secondary" onClick={()=>setKadruoklisConfig(KADRUOKLIS_DEFAULTS)}>Atkurti pradinius nustatymus</button>

@@ -312,3 +312,7 @@
 .quality-reason-warn{color:#f2cf83}
 .quality-reason-bad{color:#f2a0a0}
 @media(max-width:600px){.quality-config-grid{grid-template-columns:1fr}}
+
+/* Claude Kadruoklis CLIP model controls */
+.quality-run.secondary{width:100%;justify-content:center;margin-top:8px}
+.quality-progress.error{color:#ff9a9a}

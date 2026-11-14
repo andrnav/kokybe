@@ -64,3 +64,13 @@ Po analizės pateikiama viena aiški apkirpto kadro santrauka: spaudos tinkamuma
 - Vertinimo ribas galima keisti rezultatų skiltyje; jos saugomos naršyklėje.
 - Claude projekto `ai.js` neperkeltas: jis naudoja bendrą CLIP zero-shot modelį ir tekstines poras, ne atskirai išmokytą CLIP-IQA modelį.
 - Perkelti skaitiniai slenksčiai yra pradinės heuristikos. Juos būtina kalibruoti su realiais spaudos pavyzdžiais.
+
+
+## v2.5.1 – Claude „Kadruoklis“ CLIP modelio integracija
+- Įdėtas tas pats `Xenova/clip-vit-base-patch16` modelis iš pateikto `kadruoklis/ai.js`, per Transformers.js 3.8.1, Q8 ir WASM.
+- Išsaugotos Claude projekto penkios tekstų poros: bendras kokybės, ryškumo, švaros/triukšmo, šviesumo ir kontrasto vertinimas.
+- AI veikia tik paspaudus mygtuką, po to, kai atlikta matematinė apkirpto kadro analizė.
+- CLIP vertina centrinį viso kadro fragmentą ir iki keturių matematiškai atrinktų detalių fragmentų.
+- AI rezultatas rodomas atskiroje santraukos eilutėje ir gali sumažinti bendrą 1–5 spaudos įvertinimą pagal Claude projekto `aiBad` ribą (numatyta 0,30).
+- Modelis atsisiunčiamas pirmą kartą iš Hugging Face per Transformers.js; reikalingas internetas. Vaizdo pikseliai apdorojami lokaliai naršyklėje, į serverį nesiunčiami.
+- Svarbu: tai tas pats bendras CLIP ViT modelis ir tekstinių porų metodas iš Claude projekto, o ne atskirai IQA duomenimis išmokytas CLIP-IQA modelis. Jo procentai yra modelio panašumo į tekstinius aprašymus tikimybės tipo balai, ne kalibruota objektyvi nuotraukos kokybės tikimybė.
