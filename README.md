@@ -69,3 +69,12 @@ Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe
 - Spausdinimo formato pasirinkimas ir rankiniai matmenys išjungiami „Laisvas“ režime. Kiti režimai vėl naudoja pasirinktą formatą.
 - Pikseliai, DPI ir kokybės įvertinimas perkeltas šalia failo pavadinimo.
 - Kopijų kiekio valdiklis perkeltas į kiekvienos nuotraukos kortelę apačioje, po miniatiūra ir failo pavadinimu.
+
+
+## v1.9 – HEIC/HEIF ir PDF palaikymas
+
+- HEIC ir HEIF failai konvertuojami į PNG naršyklėje; jei konverteris nepavyksta, bandomas naršyklės vietinis dekodavimas.
+- Įkeliant PDF kiekvienas puslapis atskirai atvaizduojamas į PNG (3× PDF puslapio masteliu) ir įtraukiamas į bendrą nuotraukų eilę.
+- PDF puslapių failų pavadinimai gauna puslapio numerį, pvz. `Dokumentas - 001.png`.
+- Originalus HEIC/HEIF arba PDF failas nekeičiamas. Eksportuojamos tik apdorotos nuotraukų kopijos.
+- Nepavykus įkelti failo, pranešime parodomas konkretus failo pavadinimas ir klaidos priežastis.

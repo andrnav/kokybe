@@ -2,9 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import JSZip from 'jszip';
 import heic2any from 'heic2any';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import * as UTIF from 'utif';
 import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2 } from 'lucide-react';
 import './style.css';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const FORMATS = [
   { id: '10x15', label: '10 × 15 cm', ratioLabel: '2:3', cm: [10, 15] },
@@ -35,27 +39,97 @@ const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 const round1 = n => Math.round(n * 10) / 10;
 
+async function blobToImage(blob) {
+  const url = URL.createObjectURL(blob);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Naršyklė negali perskaityti vaizdo failo.'));
+      img.src = url;
+    });
+    return { url, image, width: image.naturalWidth, height: image.naturalHeight };
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+}
+
+async function decodePdf(file) {
+  const data = new Uint8Array(await file.arrayBuffer());
+  const pdf = await pdfjsLib.getDocument({ data }).promise;
+  const pages = [];
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+    const page = await pdf.getPage(pageNumber);
+    // 3x scale gives a useful raster source for photo-print cropping while keeping
+    // ordinary A4 pages at a manageable pixel size.
+    const viewport = page.getViewport({ scale: 3 });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const context = canvas.getContext('2d', { alpha: false });
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({ canvasContext: context, viewport, background: '#ffffff' }).promise;
+    const blob = await new Promise((resolve, reject) => canvas.toBlob(
+      value => value ? resolve(value) : reject(new Error(`Nepavyko paruošti PDF ${pageNumber} puslapio.`)),
+      'image/png'
+    ));
+    const decoded = await blobToImage(blob);
+    const stem = file.name.replace(/\.pdf$/i, '');
+    pages.push({
+      ...decoded,
+      name: `${stem} - ${String(pageNumber).padStart(3, '0')}.png`,
+      sourceName: file.name,
+      pdfPage: pageNumber,
+      pdfPageCount: pdf.numPages,
+    });
+    page.cleanup();
+  }
+  await pdf.destroy();
+  return pages;
+}
+
 async function decodeFile(file) {
   const ext = file.name.split('.').pop().toLowerCase();
   let blob = file;
   if (['heic', 'heif'].includes(ext)) {
-    const converted = await heic2any({ blob: file, toType: 'image/png' });
-    blob = Array.isArray(converted) ? converted[0] : converted;
+    try {
+      const converted = await heic2any({ blob: file, toType: 'image/png' });
+      blob = Array.isArray(converted) ? converted[0] : converted;
+      if (!(blob instanceof Blob) || !blob.size) throw new Error('HEIC konverteris negrąžino vaizdo.');
+    } catch (conversionError) {
+      // Some Safari versions can decode HEIC natively even when the converter fails.
+      try {
+        const bitmap = await createImageBitmap(file);
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        canvas.getContext('2d').drawImage(bitmap, 0, 0);
+        bitmap.close?.();
+        blob = await new Promise((resolve, reject) => canvas.toBlob(
+          value => value ? resolve(value) : reject(new Error('Nepavyko konvertuoti HEIC vaizdo.')),
+          'image/png'
+        ));
+      } catch {
+        throw new Error(`Nepavyko perskaityti HEIC/HEIF failo „${file.name}“. ${conversionError?.message || ''}`.trim());
+      }
+    }
   } else if (['tif', 'tiff'].includes(ext)) {
     const buffer = await file.arrayBuffer();
     const ifds = UTIF.decode(buffer);
+    if (!ifds.length) throw new Error('TIFF faile nerastas vaizdas.');
     UTIF.decodeImage(buffer, ifds[0]);
     const rgba = UTIF.toRGBA8(ifds[0]);
     const canvas = document.createElement('canvas');
     canvas.width = ifds[0].width; canvas.height = ifds[0].height;
     canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(rgba), canvas.width, canvas.height), 0, 0);
-    blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+    blob = await new Promise((resolve, reject) => canvas.toBlob(
+      value => value ? resolve(value) : reject(new Error('Nepavyko konvertuoti TIFF failo.')),
+      'image/png'
+    ));
   }
-  const url = URL.createObjectURL(blob);
-  const image = await new Promise((resolve, reject) => {
-    const img = new Image(); img.onload = () => resolve(img); img.onerror = reject; img.src = url;
-  });
-  return { url, image, width: image.naturalWidth, height: image.naturalHeight };
+  return blobToImage(blob);
 }
 
 function getFormat(photo) {
@@ -238,17 +312,43 @@ function App() {
   };
 
   const addFiles = async files => {
-    const accepted = Array.from(files).filter(f => /\.(jpe?g|png|webp|bmp|gif|heic|heif|tif|tiff)$/i.test(f.name));
-    if (!accepted.length) { setMessage('Pasirink JPG, PNG, WEBP, HEIC arba TIFF nuotraukas.'); return; }
-    setBusy(true); setMessage(`Įkeliama ${accepted.length} nuotraukų…`);
+    const accepted = Array.from(files).filter(f => /\.(jpe?g|png|webp|bmp|gif|heic|heif|tif|tiff|pdf)$/i.test(f.name));
+    if (!accepted.length) { setMessage('Pasirink JPG, PNG, WEBP, HEIC, TIFF arba PDF failus.'); return; }
+    setBusy(true); setMessage(`Įkeliama ${accepted.length} failų…`);
     const added = [];
+    const failed = [];
     for (const file of accepted) {
-      try { const decoded = await decodeFile(file); added.push({ id: uid(), name: file.name, originalFile: file, ...decoded, status: 'new', orientation: 'auto', zoom: 1, pan: { x: 0, y: 0 }, freeCrop: { x: 0, y: 0, w: decoded.width, h: decoded.height }, copies: 1, mode, format, customCm }); }
-      catch (e) { console.error(e); }
+      try {
+        if (/\.pdf$/i.test(file.name)) {
+          const pages = await decodePdf(file);
+          for (const page of pages) {
+            added.push({
+              id: uid(), originalFile: file, ...page,
+              status: 'new', orientation: 'auto', zoom: 1, pan: { x: 0, y: 0 },
+              freeCrop: { x: 0, y: 0, w: page.width, h: page.height },
+              copies: 1, mode, format, customCm,
+            });
+          }
+        } else {
+          const decoded = await decodeFile(file);
+          added.push({
+            id: uid(), name: file.name, originalFile: file, ...decoded,
+            status: 'new', orientation: 'auto', zoom: 1, pan: { x: 0, y: 0 },
+            freeCrop: { x: 0, y: 0, w: decoded.width, h: decoded.height },
+            copies: 1, mode, format, customCm,
+          });
+        }
+      } catch (e) {
+        console.error(`Nepavyko įkelti ${file.name}:`, e);
+        failed.push(`${file.name}: ${e.message || 'nežinoma klaida'}`);
+      }
     }
     setPhotos(prev => [...prev, ...added]);
     if (!activeId && added[0]) setActiveId(added[0].id);
-    setBusy(false); setMessage(added.length ? `Įkelta ${added.length} nuotraukų` : 'Nepavyko atidaryti pasirinktų failų.');
+    setBusy(false);
+    const pageCount = added.filter(p => p.pdfPage).length;
+    const summary = `Įkelta ${added.length} vaizdų${pageCount ? ` (iš jų ${pageCount} PDF puslapių)` : ''}.`;
+    setMessage(failed.length ? `${summary} Nepavyko: ${failed.join(' | ')}` : summary);
   };
 
   const exportOne = async photo => {
@@ -412,7 +512,7 @@ function App() {
         <div className="settings-actions"><button className="secondary" onClick={() => setQualityScale(DEFAULT_QUALITY_SCALE)}>Atkurti pradines reikšmes</button><button className="primary" onClick={() => setSettingsOpen(false)}>Išsaugoti</button></div>
       </section>
     </div>}
-    <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.gif,.heic,.heif,.tif,.tiff,image/*" multiple hidden onChange={e => { addFiles(e.target.files); e.target.value = ''; }}/>
+    <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.gif,.heic,.heif,.tif,.tiff,.pdf,application/pdf,image/*" multiple hidden onChange={e => { addFiles(e.target.files); e.target.value = ''; }}/>
   </div>;
 }
 

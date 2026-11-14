@@ -1,7 +1,7 @@
 {
   "name": "foto-inspektorius",
   "private": true,
-  "version": "1.8.0",
+  "version": "1.9.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -14,7 +14,8 @@
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "utif": "^3.1.0"
+    "utif": "^3.1.0",
+    "pdfjs-dist": "^4.10.38"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
