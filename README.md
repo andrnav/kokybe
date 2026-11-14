@@ -1,4 +1,4 @@
-# FotoKadravimas v1.2
+# FotoKadravimas v1.3
 
 ## Paleidimas vietoje
 
@@ -10,6 +10,15 @@ npm run dev
 ## GitHub Pages
 
 Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe/` iš `test` branch per GitHub Actions. Saugyklos `Settings → Pages → Build and deployment → Source` turi būti pasirinkta `GitHub Actions`.
+
+## v1.3 pakeitimai
+
+- „Balti kraštai“ pervadinti į „Įtalpinta“. Įtalpinimo režime galima priartinti ir pastumti nuotrauką, kad sumažėtų balti šonai; tai veikia ir pagrindinėje peržiūroje, ir eksporte.
+- Spausdinimo formatas pasirenkamas iš išskleidžiamo sąrašo; rankiniai matmenys automatiškai perjungia formatą į „Pagal skaičius“.
+- Pašalintas dešinysis informacijos skydelis ir didinimo mygtukas, todėl pagrindinė peržiūra platesnė.
+- „Atsisiųsti šią nuotrauką“ perkeltas šalia „Atstatyti“.
+- Apatinė nuotraukų juosta slenkama pelės ratuku horizontaliai.
+- Prie failo pavadinimo pridėtas kopijų skaičius. Kai skaičius didesnis nei 1, eksportuojamo failo pavadinimas prasideda, pvz., „2x - “.
 
 ## v1.2 pakeitimai
 

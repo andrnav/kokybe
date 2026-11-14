@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import JSZip from 'jszip';
 import heic2any from 'heic2any';
 import * as UTIF from 'utif';
-import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, Maximize2, ZoomIn, ZoomOut, X, Images, CircleHelp, Settings2, Move, Loader2 } from 'lucide-react';
+import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2 } from 'lucide-react';
 import './style.css';
 
 const FORMATS = [
@@ -80,20 +80,20 @@ function renderPhoto(photo, canvas, { thumbnail = false } = {}) {
     canvas.width = Math.round(wCm / 2.54 * 320);
     canvas.height = Math.round(hCm / 2.54 * 320);
   } else if (photo.mode === 'fit') {
-    const scale = Math.min(1200 / photo.width, 1200 / photo.height, 1200 / Math.max(photo.width, photo.height));
-    const contentW = photo.width * scale, contentH = photo.height * scale;
-    const maxSide = 1400;
-    const outputScale = Math.min(maxSide / (Math.max(contentW, contentH)), 1);
-    const w = Math.max(1, Math.round(photo.width * outputScale));
-    const h = Math.max(1, Math.round(photo.height * outputScale));
-    const sheetW = Math.max(w, Math.round(h * target));
-    const sheetH = Math.max(h, Math.round(w / target));
-    const finalScale = Math.min(1400 / sheetW, 1400 / sheetH, 1);
-    canvas.width = Math.max(1, Math.round(sheetW * finalScale));
-    canvas.height = Math.max(1, Math.round(sheetH * finalScale));
+    // Tikslus pasirinkto formato baltas lapas; nuotrauką galima priartinti ir pastumti.
+    const sheetW = Math.max(photo.width, Math.ceil(photo.height * target));
+    const sheetH = Math.max(photo.height, Math.ceil(photo.width / target));
+    const outputScale = thumbnail ? Math.min(360 / sheetW, 360 / sheetH, 1) : 1;
+    canvas.width = Math.max(1, Math.round(sheetW * outputScale));
+    canvas.height = Math.max(1, Math.round(sheetH * outputScale));
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const drawW = photo.width * finalScale, drawH = photo.height * finalScale;
-    ctx.drawImage(photo.image, (canvas.width - drawW) / 2, (canvas.height - drawH) / 2, drawW, drawH);
+    const fitScale = Math.min(canvas.width / photo.width, canvas.height / photo.height);
+    const z = clamp(Number(photo.zoom || 1), 1, 4);
+    const drawW = photo.width * fitScale * z, drawH = photo.height * fitScale * z;
+    const maxX = Math.max(0, (drawW - sheetW) / 2), maxY = Math.max(0, (drawH - sheetH) / 2);
+    const px = clamp(Number(photo.pan?.x || 0), -1, 1) * maxX;
+    const py = clamp(Number(photo.pan?.y || 0), -1, 1) * maxY;
+    ctx.drawImage(photo.image, (sheetW - drawW) / 2 + px, (sheetH - drawH) / 2 + py, drawW, drawH);
     return;
   } else {
     const crop = getCrop(photo);
@@ -121,16 +121,13 @@ function App() {
   const [mode, setMode] = useState('crop');
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [modal, setModal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
-  const [thumbOffset, setThumbOffset] = useState(0);
-  const [stageSizes, setStageSizes] = useState({ main: { w: 900, h: 420 }, modal: { w: 1200, h: 650 } });
+  const [stageSizes, setStageSizes] = useState({ main: { w: 900, h: 420 } });
   const fileRef = useRef(null);
   const stageRef = useRef(null);
-  const modalStageRef = useRef(null);
   const stripRef = useRef(null);
   const thumbCacheRef = useRef(new Map());
   const active = photos.find(p => p.id === activeId) || null;
@@ -143,14 +140,12 @@ function App() {
   }, [activeId]);
   useEffect(() => () => photos.forEach(p => URL.revokeObjectURL(p.url)), []);
   useEffect(() => {
-    const observe = (node, key) => {
-      if (!node) return () => {};
-      const update = () => { const r = node.getBoundingClientRect(); if (r.width && r.height) setStageSizes(s => ({ ...s, [key]: { w: r.width, h: r.height } })); };
-      const ro = new ResizeObserver(update); ro.observe(node); update(); return () => ro.disconnect();
-    };
-    const a = observe(stageRef.current, 'main'); const b = observe(modalStageRef.current, 'modal');
-    return () => { a(); b(); };
-  }, [modal, !!active]);
+    const node = stageRef.current;
+    if (!node) return;
+    const update = () => { const r = node.getBoundingClientRect(); if (r.width && r.height) setStageSizes({ main: { w: r.width, h: r.height } }); };
+    const ro = new ResizeObserver(update); ro.observe(node); update();
+    return () => ro.disconnect();
+  }, [!!active]);
 
   const updatePhoto = (id, patch) => setPhotos(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
   const patchActive = patch => {
@@ -159,7 +154,7 @@ function App() {
     setZoom(next.zoom ?? 1); setPan(next.pan || { x: 0, y: 0 });
     updatePhoto(activeId, { ...patch, status: 'editing' });
   };
-  const setZoomValue = value => patchActive({ zoom: clamp(value, 1, 3) });
+  const setZoomValue = value => patchActive({ zoom: clamp(value, 1, selectedMode === 'fit' ? 4 : 3) });
   const reset = () => { setZoom(1); setPan({ x: 0, y: 0 }); patchActive({ zoom: 1, pan: { x: 0, y: 0 }, orientation: 'auto' }); };
   const setOrientation = value => patchActive({ orientation: value });
   const navigateTo = id => {
@@ -185,7 +180,7 @@ function App() {
     setBusy(true); setMessage(`Įkeliama ${accepted.length} nuotraukų…`);
     const added = [];
     for (const file of accepted) {
-      try { const decoded = await decodeFile(file); added.push({ id: uid(), name: file.name, originalFile: file, ...decoded, status: 'new', orientation: 'auto', zoom: 1, pan: { x: 0, y: 0 }, mode, format, customCm }); }
+      try { const decoded = await decodeFile(file); added.push({ id: uid(), name: file.name, originalFile: file, ...decoded, status: 'new', orientation: 'auto', zoom: 1, pan: { x: 0, y: 0 }, copies: 1, mode, format, customCm }); }
       catch (e) { console.error(e); }
     }
     setPhotos(prev => [...prev, ...added]);
@@ -197,7 +192,8 @@ function App() {
     const canvas = document.createElement('canvas'); renderPhoto(photo, canvas);
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.98));
     if (!blob) throw new Error('JPEG eksportas nepavyko');
-    return { name: photo.name.replace(/\.[^.]+$/, '') + '.jpg', blob };
+    const prefix = Number(photo.copies || 1) > 1 ? `${photo.copies}x - ` : '';
+    return { name: prefix + photo.name.replace(/\.[^.]+$/, '') + '.jpg', blob };
   };
   const downloadBlob = (blob, name) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); };
   const exportAll = async () => {
@@ -233,36 +229,30 @@ function App() {
     return result;
   }, [photos]);
 
-  const renderStage = (large = false) => {
-    const ref = large ? modalStageRef : stageRef;
-    const size = stageSizes[large ? 'modal' : 'main'];
-    const stageW = size.w, stageH = size.h;
+  const renderStage = () => {
+    const stageW = stageSizes.main.w, stageH = stageSizes.main.h;
     let sheetStyle = {}, imageStyle = {};
     if (active) {
       const target = getTargetRatio(active);
       const sheetW = Math.min(stageW * 0.88, stageH * 0.82 * target);
       const sheetH = sheetW / target;
       sheetStyle = { width: sheetW, height: sheetH };
-      if (selectedMode === 'fit') {
-        const fitScale = Math.min(sheetW / active.width, sheetH / active.height);
-        imageStyle = { width: active.width * fitScale, height: active.height * fitScale, left: '50%', top: '50%', transform: 'translate(-50%, -50%)', objectFit: 'contain' };
-      } else {
-        const scale = Math.max(sheetW / active.width, sheetH / active.height);
-        const renderedW = active.width * scale, renderedH = active.height * scale;
-        const maxX = Math.max(0, (renderedW * zoom - sheetW) / 2);
-        const maxY = Math.max(0, (renderedH * zoom - sheetH) / 2);
-        const offsetX = pan.x * maxX, offsetY = pan.y * maxY;
-        imageStyle = { width: renderedW, height: renderedH, left: `calc(50% + ${offsetX}px)`, top: `calc(50% + ${offsetY}px)`, transform: `translate(-50%, -50%) scale(${zoom})`, objectFit: 'fill' };
-      }
+      const baseScale = selectedMode === 'fit'
+        ? Math.min(sheetW / active.width, sheetH / active.height)
+        : Math.max(sheetW / active.width, sheetH / active.height);
+      const renderedW = active.width * baseScale, renderedH = active.height * baseScale;
+      const maxX = Math.max(0, (renderedW * zoom - sheetW) / 2);
+      const maxY = Math.max(0, (renderedH * zoom - sheetH) / 2);
+      imageStyle = { width: renderedW, height: renderedH, left: `calc(50% + ${pan.x * maxX}px)`, top: `calc(50% + ${pan.y * maxY}px)`, transform: `translate(-50%, -50%) scale(${zoom})`, objectFit: 'fill' };
     }
     const getMoveLimits = () => {
       const target = getTargetRatio(active);
       const sheetW = Math.min(stageW * 0.88, stageH * 0.82 * target), sheetH = sheetW / target;
-      const scale = Math.max(sheetW / active.width, sheetH / active.height);
-      return { maxX: Math.max(1, (active.width * scale * zoom - sheetW) / 2), maxY: Math.max(1, (active.height * scale * zoom - sheetH) / 2) };
+      const baseScale = selectedMode === 'fit' ? Math.min(sheetW / active.width, sheetH / active.height) : Math.max(sheetW / active.width, sheetH / active.height);
+      return { maxX: Math.max(1, (active.width * baseScale * zoom - sheetW) / 2), maxY: Math.max(1, (active.height * baseScale * zoom - sheetH) / 2) };
     };
     const pointerDown = e => {
-      if (!active || selectedMode === 'fit' || e.target.closest('.zoom-control')) return;
+      if (!active || e.target.closest('.zoom-control')) return;
       e.preventDefault(); const lim = getMoveLimits();
       setDragging(true); setDragStart({ x: e.clientX, y: e.clientY, pan: { ...pan }, ...lim });
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -271,33 +261,30 @@ function App() {
       if (!dragging || !dragStart || !active) return;
       patchActive({ pan: { x: clamp(dragStart.pan.x + (e.clientX - dragStart.x) / dragStart.maxX, -1, 1), y: clamp(dragStart.pan.y + (e.clientY - dragStart.y) / dragStart.maxY, -1, 1) } });
     };
-    return <div className={`stage ${large ? 'stage-large' : ''}`} ref={ref} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={() => { setDragging(false); setDragStart(null); }} onPointerCancel={() => { setDragging(false); setDragStart(null); }} onWheel={e => { if (active && selectedMode !== 'fit') { e.preventDefault(); setZoomValue(zoom + (e.deltaY < 0 ? .05 : -.05)); } }}>
+    return <div className="stage" ref={stageRef} onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={() => { setDragging(false); setDragStart(null); }} onPointerCancel={() => { setDragging(false); setDragStart(null); }} onWheel={e => { if (active) { e.preventDefault(); setZoomValue(zoom + (e.deltaY < 0 ? .05 : -.05)); } }}>
       {active ? <>
         <div className={`print-sheet mode-${selectedMode}`} style={sheetStyle}>
           <img className="stage-photo" src={active.url} style={imageStyle} draggable="false" />
         </div>
-        <div className="stage-hint"><Move size={14}/> {selectedMode === 'fit' ? 'Visas originalus kadras baltame formate' : 'Vilkite nuotrauką norėdami pakeisti jos poziciją'}</div>
-        {selectedMode !== 'fit' && <div className="zoom-control"><button onClick={e => { e.stopPropagation(); setZoomValue(zoom - .1); }}><ZoomOut size={17}/></button><span>{Math.round(zoom * 100)}%</span><button onClick={e => { e.stopPropagation(); setZoomValue(zoom + .1); }}><ZoomIn size={17}/></button></div>}
+        <div className="stage-hint"><Move size={14}/> {selectedMode === 'fit' ? 'Vilkite nuotrauką ir priartinkite, kad sumažintumėte baltus kraštus' : 'Vilkite nuotrauką norėdami pakeisti jos poziciją'}</div>
+        <div className="zoom-control"><button onClick={e => { e.stopPropagation(); setZoomValue(zoom - .1); }}><ZoomOut size={17}/></button><span>{Math.round(zoom * 100)}%</span><button onClick={e => { e.stopPropagation(); setZoomValue(zoom + .1); }}><ZoomIn size={17}/></button></div>
       </> : <div className="empty-stage"><Images size={48}/><b>Įkelkite nuotraukas</b><span>Pasirinkite vieną ar daugiau JPG, PNG, HEIC arba TIFF failų</span><button className="primary" onClick={() => fileRef.current?.click()}><ImagePlus size={17}/> Įkelti nuotraukas</button></div>}
     </div>;
   };
 
-  const visiblePhotos = photos.slice(thumbOffset, thumbOffset + 8);
   const currentFormatId = active?.format || format;
   return <div className="app-shell">
     <header className="topbar"><div className="brand"><div className="brand-icon"><Camera size={21}/></div><span>FotoKadravimas</span></div><nav className="tabs"><button className="tab active"><Crop size={17}/> Kadravimas</button><button className="tab disabled" title="Šis skirsnis bus kuriamas vėliau"><Images size={17}/> Nuotraukos kokybė</button></nav><div className="top-actions"><span className="batch-count">{photos.length ? `Nuotraukų partija · ${photos.length} fail.` : 'Nauja nuotraukų partija'}</span><button className="icon-button" title="Nustatymai"><Settings2 size={19}/></button><button className="download-button" onClick={exportAll} disabled={!photos.length || busy}><Download size={17}/> Atsisiųsti viską <span className="zip-pill">ZIP</span></button></div></header>
     <main className="workspace">
-      <aside className="left-panel"><div className="panel-title">1. Spausdinimo formatas</div><div className="format-grid">{FORMATS.map(f => <button key={f.id} className={`format-option ${currentFormatId === f.id ? 'selected' : ''}`} onClick={() => changeFormat(f.id)}><b>{f.label}</b><small>{f.ratioLabel}</small></button>)}</div>
-        <div className="custom-format"><div className="custom-format-title">Rankinis formatas</div><div className="custom-format-fields"><input aria-label="Pirmas matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[0]} onChange={e => changeCustom(0, e.target.value)}/><span>×</span><input aria-label="Antras matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[1]} onChange={e => changeCustom(1, e.target.value)}/></div><button className={`custom-format-option ${currentFormatId === 'custom' ? 'selected' : ''}`} onClick={() => changeFormat('custom')}><b>Pagal skaičius</b><small>{customCm[0]} × {customCm[1]} cm</small></button></div>
-        <div className="section-divider"/><div className="panel-title">2. Kadravimo tipas</div><div className="mode-list"><button className={selectedMode === 'crop' ? 'mode selected' : 'mode'} onClick={() => { setMode('crop'); if (active) patchActive({ mode: 'crop' }); }}><Crop/><span>Kadravimas</span></button><button className={selectedMode === 'fit' ? 'mode selected' : 'mode'} onClick={() => { setMode('fit'); if (active) patchActive({ mode: 'fit' }); }}><Square/><span>Balti kraštai</span></button><button className={selectedMode === 'real' ? 'mode selected' : 'mode'} onClick={() => { setMode('real'); if (active) patchActive({ mode: 'real' }); }}><Ruler/><span>Real Size<small>320 DPI</small></span></button></div>
+      <aside className="left-panel"><div className="panel-title">1. Spausdinimo formatas</div><div className="select-wrap format-select"><select value={currentFormatId} onChange={e => changeFormat(e.target.value)}>{FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}<option value="custom">Pagal skaičius</option></select></div>
+        <div className="custom-format"><div className="custom-format-title">Rankinis formatas</div><div className="custom-format-fields"><input aria-label="Pirmas matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[0]} onChange={e => changeCustom(0, e.target.value)}/><span>×</span><input aria-label="Antras matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[1]} onChange={e => changeCustom(1, e.target.value)}/></div></div>
+        <div className="section-divider"/><div className="panel-title">2. Kadravimo tipas</div><div className="mode-list"><button className={selectedMode === 'crop' ? 'mode selected' : 'mode'} onClick={() => { setMode('crop'); if (active) patchActive({ mode: 'crop' }); }}><Crop/><span>Kadravimas</span></button><button className={selectedMode === 'fit' ? 'mode selected' : 'mode'} onClick={() => { setMode('fit'); if (active) patchActive({ mode: 'fit' }); }}><Square/><span>Įtalpinta</span></button><button className={selectedMode === 'real' ? 'mode selected' : 'mode'} onClick={() => { setMode('real'); if (active) patchActive({ mode: 'real' }); }}><Ruler/><span>Real Size<small>320 DPI</small></span></button></div>
         <div className="section-divider"/><div className="panel-title">3. Eksportas</div><div className="select-wrap"><select value="jpg" disabled><option value="jpg">JPG · Maksimali kokybė</option></select></div><div className="side-note"><CircleHelp size={17}/><span>Originalūs failai lieka nepakeisti. Korekcijos taikomos tik eksportuojamai kopijai.</span></div></aside>
-      <section className="editor-column"><div className="editor-toolbar"><div className="photo-name">{active?.name || 'Nuotrauka nepasirinkta'}</div><div className="editor-nav"><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i > 0) navigateTo(photos[i - 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === 0}><ChevronLeft size={17}/> Ankstesnė</button><span>{active ? `${photos.findIndex(p => p.id === activeId) + 1} iš ${photos.length}` : '0 iš 0'}</span><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i < photos.length - 1) navigateTo(photos[i + 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === photos.length - 1}>Kita <ChevronRight size={17}/></button></div><button className="expand-button" onClick={() => setModal(true)} disabled={!active}><Maximize2 size={17}/> Didinti</button></div>
-        {renderStage()}<div className="editor-footer"><div className="orientation-control"><span>Orientacija</span><div className="segmented"><button className={selectedOrientation === 'auto' ? 'active' : ''} onClick={() => patchActive({ orientation: 'auto' })}>Automatinė</button><button className={selectedOrientation === 'vertical' ? 'active' : ''} onClick={() => patchActive({ orientation: 'vertical' })}>Vertikali</button><button className={selectedOrientation === 'horizontal' ? 'active' : ''} onClick={() => patchActive({ orientation: 'horizontal' })}>Horizontali</button></div></div><div className="footer-actions"><button className="secondary" onClick={reset} disabled={!active}><RotateCcw size={16}/> Atstatyti</button></div></div></section>
-      <aside className="right-panel"><div className="right-heading">Koregavimo informacija</div><div className="summary-card"><span>Pasirinktas formatas</span><b>{selectedFormat.label}</b><small>{selectedFormat.ratioLabel}</small></div><div className="summary-card"><span>Kadravimo režimas</span><b>{selectedMode === 'crop' ? 'Kadravimas' : selectedMode === 'fit' ? 'Balti kraštai' : 'Real Size'}</b></div><div className="summary-card"><span>Nuotraukos būsena</span><div className="status-line">{active?.status === 'done' ? 'Atlikta' : active?.status === 'editing' ? 'Koreguojama' : 'Neatidaryta'}</div></div><div className="right-spacer"/><button className="outline-wide" onClick={exportCurrent} disabled={!active}><Download size={17}/> Atsisiųsti šią nuotrauką</button><button className="upload-wide" onClick={() => fileRef.current?.click()}><ImagePlus size={18}/> Įkelti nuotraukas</button></aside>
+      <section className="editor-column"><div className="editor-toolbar"><div className="photo-title-group"><div className="photo-name">{active?.name || 'Nuotrauka nepasirinkta'}</div>{active && <div className="copies-control"><button onClick={() => patchActive({ copies: Math.max(1, (active.copies || 1) - 1) })} disabled={(active.copies || 1) <= 1}>−</button><b>{active.copies || 1}</b><button onClick={() => patchActive({ copies: Math.min(99, (active.copies || 1) + 1) })}>＋</button></div>}</div><div className="editor-nav"><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i > 0) navigateTo(photos[i - 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === 0}><ChevronLeft size={17}/> Ankstesnė</button><span>{active ? `${photos.findIndex(p => p.id === activeId) + 1} iš ${photos.length}` : '0 iš 0'}</span><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i < photos.length - 1) navigateTo(photos[i + 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === photos.length - 1}>Kita <ChevronRight size={17}/></button></div></div>
+        {renderStage()}<div className="editor-footer"><div className="orientation-control"><span>Orientacija</span><div className="segmented"><button className={selectedOrientation === 'auto' ? 'active' : ''} onClick={() => patchActive({ orientation: 'auto' })}>Automatinė</button><button className={selectedOrientation === 'vertical' ? 'active' : ''} onClick={() => patchActive({ orientation: 'vertical' })}>Vertikali</button><button className={selectedOrientation === 'horizontal' ? 'active' : ''} onClick={() => patchActive({ orientation: 'horizontal' })}>Horizontali</button></div></div><div className="footer-actions"><button className="secondary" onClick={reset} disabled={!active}><RotateCcw size={16}/> Atstatyti</button><button className="secondary" onClick={exportCurrent} disabled={!active}><Download size={16}/> Atsisiųsti šią nuotrauką</button></div></div></section>
     </main>
-    <section className="filmstrip"><div className="strip-head"><div><b>Nuotraukų eilė</b><span>{photos.length} nuotraukos</span></div><div className="strip-tools"><button onClick={() => fileRef.current?.click()}><ImagePlus size={16}/> Pridėti</button><button onClick={() => { photos.forEach(p => URL.revokeObjectURL(p.url)); setPhotos([]); setActiveId(null); }}>Išvalyti partiją</button></div></div><div className="strip-body"><button className="strip-arrow" onClick={() => setThumbOffset(Math.max(0, thumbOffset - 1))} disabled={thumbOffset === 0}><ChevronLeft/></button><div className="thumb-list" ref={stripRef}>{visiblePhotos.map((p, i) => <button key={p.id} className={`thumb ${p.id === activeId ? 'active' : ''}`} onClick={() => navigateTo(p.id)}><div className={`thumb-image status-${p.status}`}><img src={thumbSources.get(p.id) || p.url} /></div><span className="thumb-label">{String(thumbOffset + i + 1).padStart(2, '0')}</span></button>)}</div><button className="strip-arrow" onClick={() => setThumbOffset(Math.min(Math.max(0, photos.length - 8), thumbOffset + 1))} disabled={thumbOffset + 8 >= photos.length}><ChevronRight/></button></div><div className="strip-bottom"><div className="legend"><span><i className="dot muted"/> Neatidaryta</span><span><i className="dot yellow"/> Koreguojama</span><span><i className="dot green"/> Peržiūrėta</span></div><div className="strip-message">{busy ? <><Loader2 className="spin" size={14}/>{message}</> : message}</div><div className="strip-count">{photos.filter(p => p.status === 'done').length} / {photos.length} peržiūrėta</div></div></section>
+    <section className="filmstrip"><div className="strip-head"><div><b>Nuotraukų eilė</b><span>{photos.length} nuotraukos</span></div><div className="strip-tools"><button onClick={() => fileRef.current?.click()}><ImagePlus size={16}/> Pridėti</button><button onClick={() => { photos.forEach(p => URL.revokeObjectURL(p.url)); setPhotos([]); setActiveId(null); }}>Išvalyti partiją</button></div></div><div className="strip-body"><button className="strip-arrow" onClick={() => stripRef.current?.scrollBy({ left: -240, behavior: 'smooth' })}><ChevronLeft/></button><div className="thumb-list" ref={stripRef} onWheel={e => { if (stripRef.current) { e.preventDefault(); stripRef.current.scrollLeft += Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX; } }}>{photos.map((p, i) => <button key={p.id} className={`thumb ${p.id === activeId ? 'active' : ''}`} onClick={() => navigateTo(p.id)}><div className={`thumb-image status-${p.status}`}><img src={thumbSources.get(p.id) || p.url} /></div><span className="thumb-label">{String(i + 1).padStart(2, '0')}</span></button>)}</div><button className="strip-arrow" onClick={() => stripRef.current?.scrollBy({ left: 240, behavior: 'smooth' })}><ChevronRight/></button></div><div className="strip-bottom"><div className="legend"><span><i className="dot muted"/> Neatidaryta</span><span><i className="dot yellow"/> Koreguojama</span><span><i className="dot green"/> Peržiūrėta</span></div><div className="strip-message">{busy ? <><Loader2 className="spin" size={14}/>{message}</> : message}</div><div className="strip-count">{photos.filter(p => p.status === 'done').length} / {photos.length} peržiūrėta</div></div></section>
     <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.gif,.heic,.heif,.tif,.tiff,image/*" multiple hidden onChange={e => { addFiles(e.target.files); e.target.value = ''; }}/>
-    {modal && active && <div className="modal-backdrop"><div className="modal-window"><div className="modal-top"><div><b>{active.name}</b><span>Didysis kadravimo langas</span></div><div className="modal-tools"><button onClick={reset}><RotateCcw size={16}/> Atstatyti</button><button className="close-modal" onClick={() => setModal(false)}><X/></button></div></div><div className="modal-content">{renderStage(true)}<aside className="modal-side"><label>Orientacija</label><div className="segmented vertical"><button className={selectedOrientation === 'auto' ? 'active' : ''} onClick={() => patchActive({ orientation: 'auto' })}>Automatinė</button><button className={selectedOrientation === 'vertical' ? 'active' : ''} onClick={() => patchActive({ orientation: 'vertical' })}>Vertikali</button><button className={selectedOrientation === 'horizontal' ? 'active' : ''} onClick={() => patchActive({ orientation: 'horizontal' })}>Horizontali</button></div><label>Mastelis</label><input type="range" min="1" max="3" step="0.01" value={zoom} onChange={e => setZoomValue(Number(e.target.value))}/><div className="modal-zoom">{Math.round(zoom * 100)}%</div><div className="modal-spacer"/></aside></div></div></div>}
   </div>;
 }
 
