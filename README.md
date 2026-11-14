@@ -1,30 +1,43 @@
-# Photo Quality AI – beta 1.0
+# Photo Quality AI 2.0
 
-Nauja lokali nuotraukų kokybės tikrinimo aplikacija.
+Naršyklėje veikiantis nuotraukų kokybės prototipas. Nuotraukos originalas nėra siunčiamas į serverį: vaizdas apdorojamas naršyklėje, o ONNX modelių failai atsisiunčiami iš Hugging Face ir talpinami Cache API.
+
+## Trys analizės režimai
+
+- **Pilna:** MUSIQ, 224 × 224 įvestis, `[-1, 1]` normalizacija, dokumentuota 0–100 skalė.
+- **Optimizuota:** HyperIQA, ImageNet normalizacija, penkių iškarpų vidurkis, dokumentuota 0–1 skalė konvertuojama į 0–100.
+- **Mažoji:** DBCNN, ImageNet normalizacija, dokumentuota 0–100 skalė.
+
+Kiekvienam modeliui atskirai parsisiunčiami abu failai: `.onnx` ir `.onnx.data`. ONNX Runtime Web `externalData` parametre perduodamas papildomas failas su tiksliu modelio viduje nurodytu keliu. Failai saugomi naršyklės Cache API, jei naršyklė leidžia.
 
 ## Paleidimas
+
 ```bash
 npm install
 npm run dev
 ```
 
-## Build
+## Sukūrimas GitHub Pages
+
 ```bash
 npm run build
 ```
 
-## GitHub Pages
-Projektas sukonfigūruotas publikuoti iš `andrnav/kokybe` šakninio Vite build'o (`base: '/kokybe/'`). Reikės GitHub Actions workflow arba Pages deploy konfigūracijos.
+Vite bazinis kelias nustatytas į `/kokybe/`, kaip ir ankstesnėje `andrnav/kokybe` saugykloje.
 
-## Privatumas
-Nuotraukos nėra siunčiamos į aplikacijos serverį. AI modeliai atsisiunčiami iš Hugging Face į naršyklę ir gali būti saugomi Cache API.
+## Privatumas ir tinklo naudojimas
 
-## Svarbūs beta apribojimai
-- Šiame leidime AI kokybės modelių ONNX įvesties / išvesties kontraktas dar turi būti patikrintas su realiu modelio vykdymu konkrečiose naršyklėse. Jei išvesties mastelis neatpažįstamas, programa sąmoningai nerodo balo.
-- Veidų ir akių lokali analizė dar neįjungta. UI ir architektūra paruošta kitam etapui; bendro NR-IQA balo negalima laikyti veido ryškumo detektoriumi.
-- TIFF / BigTIFF analizė dar nepalaikoma.
-- PPI profiliai yra laboratoriniai orientaciniai slenksčiai, juos reikia kalibruoti su realiais spaudiniais.
-- ONNX modelių failų dydžiai ir prieinamumas priklauso nuo modelių saugyklos. Modeliai neįtraukti į ZIP, kad GitHub saugykla nebūtų užpildyta dideliais binariniais failais.
+- Nuotraukos turinys nekeliamas į Hugging Face ar GitHub.
+- Pirmą kartą pasirinkus režimą, atsisiunčiami jo modelio failai. Dydžiai pagal modelio kortelę: DBCNN apie 59 MB, HyperIQA apie 105 MB, MUSIQ apie 104 MB.
+- Modelių atsisiuntimui būtinas internetas. Vėliau failai gali būti naudojami iš naršyklės talpyklos, jei ji jų neišvalė.
+- Modelių talpykla yra atskira kiekvienai naršyklei / įrenginiui.
 
-## Modelių šaltinis
-86Cao/IQA-ONNX-Models (Apache-2.0 pagal modelio kortelę): MUSIQ, DBCNN, HyperIQA ir kiti.
+## Modelių kilmė ir ribos
+
+Modeliai: `86Cao/IQA-ONNX-Models` (Hugging Face). Modelio kortelėje nurodyta Apache-2.0 licencija; kortelė taip pat pažymi, kad originalių svorių licencijos gali skirtis. Modelių kortelėje nurodyti įvesties dydžiai, normalizacija ir rezultatų skalės.
+
+Tai NR-IQA modeliai, kurie prognozuoja bendrą suvokiamą vaizdo kokybę. Jie nėra specializuoti veidų / akių ryškumo, fokusavimo klaidų lokalizavimo ar triukšmo žemėlapio modeliai. Šioje versijoje AI balas neturi būti interpretuojamas kaip patvirtinta spaudos garantija. PPI vertinimas yra atskiras techninis skaičiavimas.
+
+## Svarbu prieš gamybinį naudojimą
+
+`npm run build` patikrina TypeScript ir Vite kompiliaciją, bet neįrodo, kad visi modeliai sėkmingai veikia kiekvienoje Safari / Chrome versijoje ar GPU tvarkyklėje. Prieš realų laboratorijos naudojimą būtina atlikti naršyklės testus su realiais failais ir palyginti modelių prognozes su atspaudais.

@@ -7,7 +7,7 @@ type Result = Awaited<ReturnType<typeof runIqa>>
 const modes: { id: Mode; title: string; desc: string; icon: typeof Cpu }[] = [
   { id:'full', title:'Pilna AI analizė', desc:'MUSIQ modelis. Išsamiausias bendros vaizdo kokybės režimas.', icon: ScanEye },
   { id:'optimized', title:'Optimizuota AI analizė', desc:'HyperIQA modelis. Kasdieniam darbui ir greitesnei analizei.', icon: Zap },
-  { id:'light', title:'Mažesnis AI modelis + bazinė analizė', desc:'DBCNN modelis. Silpnesniems kompiuteriams.', icon: Cpu }
+  { id:'light', title:'Mažesnis AI modelis', desc:'DBCNN modelis. Mažesnis atsisiuntimas ir lengvesnis režimas.', icon: Cpu }
 ]
 export default function App() {
   const [file,setFile] = useState<File|null>(null)
@@ -49,6 +49,6 @@ export default function App() {
       {error&&<section className="alert"><AlertTriangle/><div><b>Analizė nepavyko</b><p>{error}</p></div></section>}
       {result&&<section className="result panel"><div className="resultHead"><div><div className="eyebrow">AI KOKYBĖS ĮVERTINIMAS</div><h3>{qualityWord(result.score)}</h3></div><div className="score">{result.score}<small>/100</small></div></div><div className="bar"><div style={{width:`${result.score}%`}}/></div><div className="resultGrid"><div><span>AI modelis</span><b>{result.model}</b></div><div><span>Vykdymas</span><b>{result.provider==='webgpu'?'GPU / WebGPU':'CPU / WASM'}</b></div><div><span>Analizės laikas</span><b>{(result.durationMs/1000).toFixed(1)} s</b></div><div><span>Spaudos raiška</span><b>{Math.round(effectivePpi)} PPI</b></div></div><p className="caveat"><AlertTriangle size={16}/> AI balas yra bendros vaizdo kokybės prognozė, ne garantija spaudos rezultatui. Šiame pradiniame leidime dar nėra atskiro veidų / akių ryškumo modelio ir triukšmo lokalizavimo.</p></section>}
     </div>
-    <footer>PHOTO QUALITY AI <span>•</span> VIETINĖ ANALIZĖ <span>•</span> BETA 1.0</footer>
+    <footer>PHOTO QUALITY AI <span>•</span> VIETINĖ ANALIZĖ <span>•</span> BETA 2.0</footer>
   </main>
 }
