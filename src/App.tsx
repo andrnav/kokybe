@@ -1,6 +1,6 @@
 import type React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap, Crop, Calculator, Sparkles, Download, ZoomIn, ZoomOut, RotateCcw, Layers, Images } from 'lucide-react'
+import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap, Crop, Calculator, Sparkles, Download, RotateCcw, Layers, Images } from 'lucide-react'
 import type { Mode, Profile } from './analysis'
 import { printGrade, qualityWord, runIqa } from './analysis'
 
@@ -13,7 +13,7 @@ type Rect = { x:number;y:number;width:number;height:number;scale:number;left:num
 
 
 type BatchOutput = 'jpg' | 'tif'
-type BatchItem = { id:string; file:File; status:'waiting'|'done'|'error'; message?:string; output?:Blob; outputName?:string; width?:number;height?:number }
+type BatchItem = { id:string; file:File; previewUrl:string; status:'waiting'|'done'|'error'; message?:string; output?:Blob; outputName?:string; width?:number;height?:number }
 async function decodeBatchFile(file:File):Promise<HTMLImageElement>{
   let source:Blob=file
   if(/\.heic$/i.test(file.name)||file.type==='image/heic'||file.type==='image/heif'){
@@ -167,7 +167,6 @@ export default function App() {
     const maxX=Math.max(0,(image.naturalWidth*s-fw)/2),maxY=Math.max(0,(image.naturalHeight*s-fh)/2)
     return {x:Math.max(-maxX,Math.min(maxX,next.x)),y:Math.max(-maxY,Math.min(maxY,next.y))}
   }
-  function setZoomLevel(z:number){const nz=Math.max(1,Math.min(10000,z));setZoom(nz);setPan(p=>clampPan(p,nz));setMathConfirmed(false);setCropBlob(null);setCropUrl('')}
   function onPointerDown(e:React.PointerEvent){if(!image)return;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);dragRef.current={x:e.clientX,y:e.clientY,panX:pan.x,panY:pan.y,mode:'pan',frameScale:cropFrameScale}}
   function onCornerDown(e:React.PointerEvent){e.preventDefault();e.stopPropagation();if(!image)return;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);dragRef.current={x:e.clientX,y:e.clientY,panX:pan.x,panY:pan.y,mode:'resize',frameScale:cropFrameScale}}
   function onPointerMove(e:React.PointerEvent){const bounds=stageRef.current?.getBoundingClientRect();if(bounds)setPointer({x:e.clientX-bounds.left,y:e.clientY-bounds.top,visible:true});if(!dragRef.current)return;const d=dragRef.current;const dx=e.clientX-d.x,dy=e.clientY-d.y;if(d.mode==='resize'){const delta=(dx+dy*(ratio>1?ratio:1/ratio))/Math.max(260,stageSize.width+stageSize.height)*2.2;const next=Math.max(.35,Math.min(1,d.frameScale+delta));setCropFrameScale(next);setPan(p=>clampPan(p,zoom));}else{setPan(clampPan({x:d.panX+dx,y:d.panY+dy}));}setMathConfirmed(false);setCropBlob(null);setCropUrl('')}
