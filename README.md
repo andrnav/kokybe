@@ -35,3 +35,10 @@ Modeliai veikia naršyklėje per ONNX Runtime Web ir pirmą kartą atsisiunčiam
 
 ## v2.2.0 – nuotraukos kokybės santrauka
 Po analizės pateikiama viena aiški apkirpto kadro santrauka: spaudos tinkamumas, tikslus DPI, ryškumo ir susiliejimo rizikos indikatorius, triukšmo indikatorius, ekspozicija, AI modelių bendras signalas ir galutinė rekomendacija. DPI skaičiuojamas pagal apkirpto vaizdo pikselius ir pasirinktą fizinį spaudos dydį. Ryškumo, triukšmo ir ekspozicijos reikšmės yra automatiniai vaizdo signalų įverčiai, ne laboratoriniai matavimai.
+
+
+## v2.3.0 – sąsajos ir valdymo supaprastinimas
+- Kokybės išvada rodoma iškart po kadro peržiūra, prieš techninius DPI rodiklius.
+- Pašalintas AI modelių pasirinkimo sąrašas; naudojamas automatinis vidinis modelių rinkinys.
+- Priartinimas valdomas tiesiai ant nuotraukos esančiais +/− mygtukais arba pelės ratuku, ne šoniniu slankikliu.
+- Rezultatų santraukai nustatytas pilnas matomumas, ji nebesuspaudžiama peržiūros skydelyje.
