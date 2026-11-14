@@ -74,3 +74,12 @@ Po analizės pateikiama viena aiški apkirpto kadro santrauka: spaudos tinkamuma
 - AI rezultatas rodomas atskiroje santraukos eilutėje ir gali sumažinti bendrą 1–5 spaudos įvertinimą pagal Claude projekto `aiBad` ribą (numatyta 0,30).
 - Modelis atsisiunčiamas pirmą kartą iš Hugging Face per Transformers.js; reikalingas internetas. Vaizdo pikseliai apdorojami lokaliai naršyklėje, į serverį nesiunčiami.
 - Svarbu: tai tas pats bendras CLIP ViT modelis ir tekstinių porų metodas iš Claude projekto, o ne atskirai IQA duomenimis išmokytas CLIP-IQA modelis. Jo procentai yra modelio panašumo į tekstinius aprašymus tikimybės tipo balai, ne kalibruota objektyvi nuotraukos kokybės tikimybė.
+
+
+## v2.5.4 – vieninga analizės ataskaita
+- Pašalintas atskiras rezultatų blokas šoninėje juostoje. Visi skaičiavimai pateikiami vienoje detalioje ataskaitoje po nuotraukos peržiūra.
+- Pašalintas žalias / raudonas zonų žymėjimas ant nuotraukos.
+- Pašalinti atskiri DPI ir raiškos rezultatų blokai; jų duomenys perkelti į vieną ataskaitą.
+- Pagrindinis veiksmas pervadintas į „Tikrinti nuotrauką“.
+- Jei CLIP modelis jau įkeltas, pagrindinis tikrinimo veiksmas paleidžia ir matematinę, ir CLIP analizę.
+- CLIP rezultatai pateikiami po nuotrauka aiškia kalba: bendra kokybė, ryškumas, triukšmas, šviesumas ir kontrastas. Procentai paaiškinami kaip teksto ir vaizdo panašumo balai, o ne objektyvios kokybės tikimybė.
