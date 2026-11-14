@@ -1,6 +1,6 @@
 import type React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap, Crop, Calculator, Sparkles, Download, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
+import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap, Crop, Calculator, Sparkles, Download, ZoomIn, ZoomOut, RotateCcw, Layers, Images } from 'lucide-react'
 import type { Mode, Profile } from './analysis'
 import { printGrade, qualityWord, runIqa } from './analysis'
 
@@ -11,7 +11,98 @@ const wideFormats = [[30,40],[40,60],[50,70],[50,75],[60,90],[70,100],[100,150]]
 const fmt = (w:number,h:number)=>`${w} × ${h} cm`
 type Rect = { x:number;y:number;width:number;height:number;scale:number;left:number;top:number;frameLeft:number;frameTop:number;frameWidth:number;frameHeight:number }
 
+
+type BatchOutput = 'jpg' | 'tif'
+type BatchItem = { id:string; file:File; status:'waiting'|'done'|'error'; message?:string; output?:Blob; outputName?:string; width?:number;height?:number }
+async function decodeBatchFile(file:File):Promise<HTMLImageElement>{
+  let source:Blob=file
+  if(/\.heic$/i.test(file.name)||file.type==='image/heic'||file.type==='image/heif'){
+    const mod=await import('heic2any')
+    const converted=await mod.default({blob:file,toType:'image/png'})
+    source=Array.isArray(converted)?converted[0]:converted
+  }
+  const url=URL.createObjectURL(source)
+  try{const img=new Image();img.src=url;await img.decode();return img}catch{throw new Error('Šio formato nepavyko iškoduoti šiame kompiuteryje.')}finally{URL.revokeObjectURL(url)}
+}
+function encodeTiff(canvas:HTMLCanvasElement):Blob{
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});if(!ctx)throw new Error('Nepavyko nuskaityti vaizdo')
+  const {width,height}=canvas,rgba=ctx.getImageData(0,0,width,height).data
+  const pixels=new Uint8Array(width*height*3)
+  for(let i=0,j=0;i<rgba.length;i+=4){pixels[j++]=rgba[i];pixels[j++]=rgba[i+1];pixels[j++]=rgba[i+2]}
+  const entries=11,ifdOffset=8,ifdSize=2+entries*12+4,bitsOffset=ifdOffset+ifdSize,pixelOffset=bitsOffset+6
+  const buffer=new ArrayBuffer(pixelOffset+pixels.length),view=new DataView(buffer),bytes=new Uint8Array(buffer)
+  view.setUint8(0,0x49);view.setUint8(1,0x49);view.setUint16(2,42,true);view.setUint32(4,ifdOffset,true)
+  view.setUint16(ifdOffset,entries,true)
+  let o=ifdOffset+2
+  const entry=(tag:number,type:number,count:number,value:number)=>{view.setUint16(o,tag,true);view.setUint16(o+2,type,true);view.setUint32(o+4,count,true);view.setUint32(o+8,value,true);o+=12}
+  entry(256,4,1,width);entry(257,4,1,height);entry(258,3,3,bitsOffset);entry(259,3,1,1);entry(262,3,1,2);entry(273,4,1,pixelOffset);entry(277,3,1,3);entry(278,4,1,height);entry(279,4,1,pixels.length);entry(284,3,1,1);entry(296,3,1,2)
+  view.setUint32(o,0,true)
+  view.setUint16(bitsOffset,8,true);view.setUint16(bitsOffset+2,8,true);view.setUint16(bitsOffset+4,8,true)
+  bytes.set(pixels,pixelOffset)
+  return new Blob([buffer],{type:'image/tiff'})
+}
+function BatchProcessor(){
+  const [items,setItems]=useState<BatchItem[]>([])
+  const [ratio,setRatio]=useState('original')
+  const [output,setOutput]=useState<BatchOutput>('jpg')
+  const [quality,setQuality]=useState(1)
+  const [copies,setCopies]=useState(1)
+  const [busy,setBusy]=useState(false)
+  const [message,setMessage]=useState('')
+  const [selected,setSelected]=useState<string|null>(null)
+  const input=useRef<HTMLInputElement>(null)
+  const addFiles=(files:FileList|null)=>{if(!files)return;const accepted=Array.from(files).filter(f=>f.type.startsWith('image/')||/\.(heic|heif|tif|tiff|bmp|avif|gif)$/i.test(f.name));setItems(prev=>[...prev,...accepted.map((file)=>({id:`${file.name}-${file.size}-${Math.random()}`,file,previewUrl:URL.createObjectURL(file),status:'waiting' as const}))]);setMessage('')}
+  const aspect=ratio==='original'?null:ratio==='3:2'?3/2:ratio==='2:3'?2/3:ratio==='4:3'?4/3:ratio==='1:1'?1:16/9
+  async function processAll(){
+    if(!items.length||busy)return
+    setBusy(true);setMessage('Apdorojamos nuotraukos...')
+    const next=[...items]
+    for(let i=0;i<next.length;i++){
+      const item=next[i]
+      try{
+        const img=await decodeBatchFile(item.file)
+        let sx=0,sy=0,sw=img.naturalWidth,sh=img.naturalHeight
+        if(aspect){const source=sw/sh;if(source>aspect){sw=sh*aspect;sx=(img.naturalWidth-sw)/2}else{sh=sw/aspect;sy=(img.naturalHeight-sh)/2}}
+        const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(sw));canvas.height=Math.max(1,Math.round(sh))
+        const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Canvas neprieinamas')
+        ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height)
+        const blob=output==='tif'?encodeTiff(canvas):await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('JPG eksportas nepavyko')),'image/jpeg',quality))
+        const base=item.file.name.replace(/\.[^.]+$/,'')
+        const prefix=copies>1?`${copies}x - `:''
+        const ext=output==='tif'?'tif':'jpg'
+        next[i]={...item,status:'done',output:blob,outputName:`${prefix}${base}.${ext}`,width:canvas.width,height:canvas.height}
+      }catch(e){next[i]={...item,status:'error',message:e instanceof Error?e.message:String(e)}}
+      setItems([...next]);setMessage(`Apdorota ${i+1} iš ${next.length}`)
+    }
+    setBusy(false);setMessage('Apdorojimas baigtas. Pažymėtos nuotraukos paruoštos eksportui.')
+  }
+  async function downloadAll(){
+    const ready=items.filter(i=>i.output&&i.outputName);if(!ready.length)return
+    const {default:JSZip}=await import('jszip');const zip=new JSZip()
+    ready.forEach(i=>zip.file(i.outputName!,i.output!))
+    const blob=await zip.generateAsync({type:'blob',compression:'STORE'})
+    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='photo-batch.zip';a.click();URL.revokeObjectURL(url)
+  }
+  function downloadOne(item:BatchItem){if(!item.output||!item.outputName)return;const url=URL.createObjectURL(item.output),a=document.createElement('a');a.href=url;a.download=item.outputName;a.click();URL.revokeObjectURL(url)}
+  const selectedItem=items.find(i=>i.id===selected)
+  return <section className="batchWorkspace">
+    <div className="batchHeader"><div><div className="eyebrow">MASINIS APDOROJIMAS</div><h2>Partijų apdorojimas</h2><p>Įkelk nuotraukas, pasirink apkirpimo proporciją ir eksportavimo formatą.</p></div><button className="analyze" onClick={()=>input.current?.click()}><ImagePlus size={17}/> Pridėti nuotraukas</button><input ref={input} hidden multiple type="file" accept="image/*,.heic,.heif,.tif,.tiff,.bmp,.avif,.gif" onChange={e=>{addFiles(e.target.files);e.currentTarget.value=''}}/></div>
+    <div className="batchSettings panel">
+      <label className="field">Apkirpimo proporcija<select value={ratio} onChange={e=>setRatio(e.target.value)}><option value="original">Originali (neapkirpti)</option><option value="3:2">3:2</option><option value="2:3">2:3</option><option value="4:3">4:3</option><option value="1:1">1:1</option><option value="16:9">16:9</option></select></label>
+      <label className="field">Išsaugojimo formatas<select value={output} onChange={e=>setOutput(e.target.value as BatchOutput)}><option value="jpg">JPG (maksimali kokybė)</option><option value="tif">TIFF (be suspaudimo)</option></select></label>
+      {output==='jpg'&&<label className="field">JPG kokybė <select value={quality} onChange={e=>setQuality(Number(e.target.value))}><option value="1">100 % (maksimali, vis tiek nuostolinis)</option></select></label>}
+      <label className="field">Kopijų skaičius<input type="number" min="1" max="99" value={copies} onChange={e=>setCopies(Math.max(1,Math.min(99,Number(e.target.value)||1)))}/><small>{copies>1?`${copies}x - failo-pavadinimas.jpg`:'Numatyta: be prefikso'}</small></label>
+      <div className="formatNote"><ShieldCheck size={17}/><span>TIFF eksportuojamas RGB 8 bitų, visiškai be suspaudimo. JPG išsaugomas 100 % kokybės nustatymu, tačiau pats JPEG formatas vis tiek naudoja nuostolinį kodavimą.</span></div>
+    </div>
+    <div className="batchGalleryHead"><h3><Images size={18}/> Nuotraukų sąrašas <span>{items.length}</span></h3><div className="batchActions"><button className="secondaryBtn" disabled={!items.length||busy} onClick={()=>{items.forEach(i=>URL.revokeObjectURL(i.previewUrl));setItems([])}}><Trash2 size={15}/> Išvalyti</button><button className="analyze" disabled={!items.length||busy} onClick={processAll}>{busy?<Loader2 className="spin"/>:<Zap size={16}/>} Apdoroti visas</button><button className="analyze" disabled={!items.some(i=>i.output)||busy} onClick={downloadAll}><Download size={16}/> Atsisiųsti ZIP</button></div></div>
+    {message&&<p className="batchMessage">{message}</p>}
+    {!items.length?<button className="batchEmpty" onClick={()=>input.current?.click()}><ImagePlus size={36}/><b>Įkelk iki 100 nuotraukų ar daugiau</b><span>JPG, PNG, HEIC, GIF, WebP, BMP, TIFF ir kiti naršyklės palaikomi vaizdai</span></button>:<div className="batchContent"><div className="thumbGrid">{items.map(item=><button key={item.id} className={`thumbCard ${selected===item.id?'chosen':''}`} onClick={()=>setSelected(item.id)}><div className="thumbPreview"><img src={item.previewUrl} alt="" onError={e=>{e.currentTarget.style.display="none"}}/>{item.output?<span className="doneMark">✓</span>:null}<span className="thumbExt">{item.file.name.split('.').pop()?.toUpperCase()}</span></div><b title={item.file.name}>{item.file.name}</b><small>{item.status==='done'?`${item.width} × ${item.height} px · Paruošta`:item.status==='error'?item.message:'Laukia apdorojimo'}</small>{item.output&&<span className="thumbDownload" onClick={e=>{e.stopPropagation();downloadOne(item)}}>Atsisiųsti</span>}</button>)}</div><aside className="batchDetail">{selectedItem?<><b>{selectedItem.file.name}</b><span>{(selectedItem.file.size/1024/1024).toFixed(2)} MB</span><span>{selectedItem.status==='done'?'Paruošta eksportui':selectedItem.status==='error'?selectedItem.message:'Dar neapdorota'}</span>{selectedItem.output&&<button className="analyze" onClick={()=>downloadOne(selectedItem)}><Download size={15}/> Atsisiųsti failą</button>}</>:<p>Pasirink nuotrauką sąraše, kad matytum jos informaciją.</p>}</aside></div>}
+    <p className="hint">Failai apdorojami vietoje naršyklėje. GIF atveju naudojamas pirmasis kadras. HEIC dekodavimui naudojama lokaliai įkeliama biblioteka. RAW failai sąmoningai nepalaikomi.</p>
+  </section>
+}
+
 export default function App() {
+  const [activeTab,setActiveTab] = useState<'quality'|'batch'>('quality')
   const [file,setFile] = useState<File|null>(null)
   const [image,setImage] = useState<HTMLImageElement|null>(null)
   const [url,setUrl] = useState('')
@@ -114,6 +205,9 @@ export default function App() {
   const drop=(e:React.DragEvent)=>{dragOver(e);const f=e.dataTransfer.files?.[0];if(f?.type.startsWith('image/'))setFile(f)}
   return <main className="shell">
     <header className="top"><div className="brand"><div className="brandIcon"><ScanEye size={25}/></div><div><div className="eyebrow">FOTOLABORATORIJOS ĮRANKIS</div><h1>Photo Quality <span>AI</span></h1></div></div><div className="local"><ShieldCheck size={16}/> Nuotrauka apdorojama šiame kompiuteryje</div></header>
+    <nav className="appTabs"><button className={activeTab==='quality'?'active':''} onClick={()=>setActiveTab('quality')}><ScanEye size={17}/> Kokybės tikrinimas</button><button className={activeTab==='batch'?'active':''} onClick={()=>setActiveTab('batch')}><Layers size={17}/> Partijų apdorojimas</button></nav>
+    {activeTab==='batch'?<BatchProcessor/>:<>
+
     <section className="intro"><div><div className="eyebrow">NUOTRAUKŲ DIAGNOSTIKA</div><h2>Patikrink prieš spausdindamas.</h2><p>Pirmiausia matematinis spaudos įvertinimas. AI analizė yra papildomas, pasirenkamas žingsnis.</p></div><div className="introMark"><Activity size={42}/></div></section>
     <div className="layout workspaceLayout">
       <section className="panel uploadPanel"><div className="sectionTitle"><FileImage/><div><h3>1. Nuotrauka</h3><p>Įtempk failą į lauką arba pasirink iš kompiuterio</p></div></div>
@@ -145,6 +239,7 @@ export default function App() {
         {result&&<div className="result"><div className="resultHead"><div><div className="eyebrow">AI KOKYBĖS PROGNOZĖ</div><h3>{result.model==='HyperIQA'?'Modelio regresijos rezultatas':qualityWord(result.score)}</h3></div><div className="score">{result.model==='HyperIQA'?result.rawScore.toFixed(4):result.score}<small>{result.model==='HyperIQA'?' raw':'/100'}</small></div></div>{result.model!=='HyperIQA'&&<div className="bar"><div style={{width:`${result.score}%`}}/></div>}<div className="resultGrid"><div><span>Modelis</span><b>{result.model}</b></div><div><span>Vykdymas</span><b>{result.provider==='webgpu'?'GPU':'CPU'}</b></div><div><span>Trukmė</span><b>{(result.durationMs/1000).toFixed(1)} s</b></div></div><p className="hint">{result.model==='HyperIQA'?'HyperIQA grąžina žalią regresijos reikšmę, kurios negalima interpretuoti kaip procentų. ':''}Modelis pateikia bendrą kokybės prognozę, o ne paaiškinamus defektų žemėlapius.</p></div>}
       </section>
     </div>
-    <footer>PHOTO QUALITY AI <span>•</span> VIETINĖ ANALIZĖ <span>•</span> BETA 4.2</footer>
+    <footer>PHOTO QUALITY AI <span>•</span> VIETINĖ ANALIZĖ <span>•</span> BETA 4.4</footer>
+    </>}
   </main>
 }
