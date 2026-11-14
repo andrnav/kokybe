@@ -2,7 +2,7 @@ import type React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap, Crop, Calculator, Sparkles } from 'lucide-react'
 import type { Mode, Profile } from './analysis'
-import { chooseProfile, ppi, profiles, printGrade, qualityWord, runIqa } from './analysis'
+import { printGrade, qualityWord, runIqa } from './analysis'
 
 type Result = Awaited<ReturnType<typeof runIqa>>
 type PrintKind = 'photo' | 'wide'
@@ -32,8 +32,6 @@ export default function App() {
   const profile:Profile = kind === 'photo' ? 'noritsu' : 'mimaki_poster'
   const ratio = width / height
   const imageRatio = image ? image.naturalWidth / image.naturalHeight : 1
-  const cropFraction = Math.min(imageRatio/ratio, ratio/imageRatio)
-  const effectivePpi = image ? Math.min(ppi(image.naturalWidth, Math.min(width, height) * Math.min(imageRatio,ratio)/Math.min(imageRatio,ratio)), ppi(image.naturalHeight, height)) : 0
   const cropPpi = image ? Math.min((Math.min(image.naturalWidth, image.naturalHeight * ratio))/(width/2.54), (Math.min(image.naturalHeight, image.naturalWidth/ratio))/(height/2.54)) : 0
   const activeFormats = kind === 'photo' ? photoFormats : wideFormats
 
@@ -64,8 +62,6 @@ export default function App() {
     {id:'optimized',title:'Vidutinis modelis',desc:'HyperIQA',icon:Zap},
     {id:'full',title:'Maksimalus modelis',desc:'MUSIQ',icon:ScanEye}
   ]
-  const currentMode=modes.find(m=>m.id===mode)!
-  const Icon=currentMode.icon
   const dragOver=(e:React.DragEvent)=>{e.preventDefault();e.stopPropagation()}
   const drop=(e:React.DragEvent)=>{dragOver(e);const f=e.dataTransfer.files?.[0];if(f?.type.startsWith('image/'))setFile(f)}
   return <main className="shell">
