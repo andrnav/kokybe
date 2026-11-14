@@ -1,30 +1,22 @@
-# FotoKadravimas – pirmasis prototipas
+# FotoKadravimas v1
 
-## Paleidimas macOS
+React + Vite nuotraukų kadravimo aplikacija.
 
-1. Įdiekite Node.js 20 arba naujesnę versiją.
-2. Išarchyvuokite projektą.
-3. Terminale pereikite į aplanką `fotokadravimas`.
-4. Vykdykite:
+## Paleidimas lokaliai
 
 ```bash
 npm install
 npm run dev
 ```
 
-5. Atidarykite terminale parodytą vietinį adresą (paprastai `http://localhost:5173`).
+## Publikavimas GitHub Pages
 
-## Kas įtraukta
+Šis projektas paruoštas adresui `https://andrnav.github.io/kokybe/` ir `test` branch.
 
-- React + Vite sąsaja lietuvių kalba.
-- 10×15, 15×30, 15×15 ir A4 formatai.
-- Kadravimo, baltų kraštų ir Real Size režimų prototipas.
-- Automatinė, vertikali ir horizontali orientacija.
-- Nuotraukų įkėlimas, miniatiūrų juosta ir būsenos.
-- Didysis koregavimo langas, mastelio ir pozicijos valdymas.
-- JPEG ir ZIP eksportavimo pradinis įgyvendinimas.
-- HEIC/HEIF ir TIFF dekodavimo bibliotekos įtrauktos į priklausomybes.
+1. Įkelkite visą projekto turinį į `kokybe` saugyklos `test` branch, įskaitant paslėptą `.github` aplanką.
+2. GitHub atidarykite **Settings → Pages**.
+3. Skiltyje **Build and deployment → Source** pasirinkite **GitHub Actions**. **Nesirinkite „Deploy from a branch“**, nes tada GitHub pateiks neapdorotą `index.html` ir naršyklė bandys vykdyti JSX failą tiesiogiai.
+4. Atidarykite **Actions** ir paleiskite arba palaukite „Deploy FotoKadravimas to GitHub Pages“ veiksmą. Jis turi baigtis žalia varnele.
+5. Tik tada atidarykite `https://andrnav.github.io/kokybe/`.
 
-## Svarbu
-
-Tai pirmasis funkcinės sąsajos prototipas, ne galutinė spaudos paruošimo versija. Prieš naudojant realiems užsakymams būtina patikrinti kadravimo koordinates, TIFF/HEIC dekodavimą, spalvų profilių išsaugojimą, DPI metaduomenis ir didelių partijų našumą. Kampiniai rėmelio taškai šioje versijoje yra vizualūs; tikslus kadravimas šiuo metu valdomas tempiant vaizdą ir keičiant mastelį.
+Kiekvienas naujas pakeitimas `test` branch automatiškai paleis naują publikavimą.
