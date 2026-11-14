@@ -1,6 +1,6 @@
 import type React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap, Crop, Calculator, Sparkles, Download, RotateCcw, Layers, Images, ZoomIn, ZoomOut, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap, Crop, Calculator, Sparkles, Download, RotateCcw, Layers, ZoomIn, ZoomOut, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Mode, Profile } from './analysis'
 import { printGrade, qualityWord, runIqa } from './analysis'
 
@@ -62,7 +62,6 @@ function BatchProcessor(){
   const baseFormat=BATCH_FORMATS[formatIndex]||BATCH_FORMATS[1]
   const targetW=orientation==='portrait'?baseFormat.w:baseFormat.h
   const targetH=orientation==='portrait'?baseFormat.h:baseFormat.w
-  const targetRatio=targetW/targetH
   const onCropPointerDown=(e:React.PointerEvent<HTMLDivElement>)=>{if(!selectedItem)return;e.currentTarget.setPointerCapture(e.pointerId);drag.current={x:e.clientX,y:e.clientY,panX:selectedItem.panX,panY:selectedItem.panY}}
   const onCropPointerMove=(e:React.PointerEvent<HTMLDivElement>)=>{if(!drag.current||!selectedItem)return;const r=e.currentTarget.getBoundingClientRect();const dx=(e.clientX-drag.current.x)/Math.max(1,r.width)*200;const dy=(e.clientY-drag.current.y)/Math.max(1,r.height)*200;update(selectedItem.id,{panX:Math.max(-100,Math.min(100,drag.current.panX+dx)),panY:Math.max(-100,Math.min(100,drag.current.panY+dy))})}
   const onCropPointerUp=()=>{drag.current=null}
