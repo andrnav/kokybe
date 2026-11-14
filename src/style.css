@@ -273,16 +273,11 @@
 @media(max-width:760px){.quality-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.quality-summary-card{padding:14px}}
 @media(max-width:440px){.quality-summary-grid{grid-template-columns:1fr}}
 
-/* v2.3.0: rezultatų santrauka visada pilnai matoma, priartinimas ant kadro */
-.quality-summary-card{display:block!important;position:relative;flex:0 0 auto!important;width:100%;min-height:210px;box-sizing:border-box;overflow:visible;margin:14px 0 18px!important}
-.quality-summary-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));}
-.quality-summary-verdict{display:block!important;color:#e5edf7!important}
-.quality-summary-footnote{display:block!important;color:#aab9cb!important}
-.quality-preview-panel{overflow:visible!important;height:auto!important;min-height:0}
-.quality-workspace-rebuilt{align-items:start!important;overflow:visible!important}
-.quality-canvas-frame{position:relative}
-.quality-zoom-overlay{position:absolute;z-index:8;right:12px;bottom:12px;display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid #ffffff35;border-radius:9px;background:#101722eF;box-shadow:0 5px 18px #0008;backdrop-filter:blur(8px)}
-.quality-zoom-overlay button{width:30px;height:30px;border:0;border-radius:6px;background:#31445c;color:#fff;font-size:20px;line-height:1;cursor:pointer}
+/* v2.3.1: aiškus santraukos rodymas ir priartinimas ant nuotraukos */
+.quality-zoom-overlay{position:absolute;z-index:10;right:14px;bottom:14px;display:flex;align-items:center;gap:7px;padding:6px 8px;border:1px solid rgba(255,255,255,.22);border-radius:10px;background:rgba(12,18,27,.88);color:#fff;backdrop-filter:blur(8px)}
+.quality-zoom-overlay button{width:30px;height:30px;border:0;border-radius:7px;background:#344356;color:#fff;font-size:20px;line-height:1;cursor:pointer}
 .quality-zoom-overlay button:disabled{opacity:.35;cursor:default}
-.quality-zoom-overlay span{min-width:48px;text-align:center;color:#f1f5f9;font-size:11px;font-weight:700}
-@media(max-width:760px){.quality-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.quality-zoom-overlay span{min-width:44px;text-align:center;font-size:12px;font-weight:700}
+.quality-canvas-frame{position:relative}
+.quality-summary-card{display:block!important;visibility:visible!important;opacity:1!important;position:relative;z-index:2}
+.quality-ai-brief{margin:10px 0;color:#aebdd0;font-size:12px}
