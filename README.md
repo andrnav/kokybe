@@ -83,3 +83,8 @@ Po analizės pateikiama viena aiški apkirpto kadro santrauka: spaudos tinkamuma
 - Pagrindinis veiksmas pervadintas į „Tikrinti nuotrauką“.
 - Jei CLIP modelis jau įkeltas, pagrindinis tikrinimo veiksmas paleidžia ir matematinę, ir CLIP analizę.
 - CLIP rezultatai pateikiami po nuotrauka aiškia kalba: bendra kokybė, ryškumas, triukšmas, šviesumas ir kontrastas. Procentai paaiškinami kaip teksto ir vaizdo panašumo balai, o ne objektyvios kokybės tikimybė.
+
+
+## v2.5.5 – build klaidos pataisymas
+- Pašalintas netyčia įterptas antras programos šaltinio fragmentas, kuris sukėlė `Expected ";" but found "React"` klaidą.
+- Atkurta viena pilna `src/main.jsx` importų ir programos struktūra.
