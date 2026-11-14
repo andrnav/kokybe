@@ -56,3 +56,19 @@ Pastaba: naršyklės peržiūra yra orientacinė. Galutinis kadravimas ir ekspor
 ## 5.0 – Printbox-inspired batch editor
 
 Masinio apdorojimo langas pertvarkytas į šviesią užsakymo darbo erdvę: nuotraukų kortelių galerija, pasirinktos nuotraukos nustatymų šoninė juosta, bendras formatas, orientacija, kadravimo režimas, priartinimas, individualus kopijų skaičius ir eksportas. Nuotraukas galima pasirinkti galerijoje ir stumdyti tiesiogiai jų kortelėse.
+
+
+## 5.1 – Cropper.js kadravimo variklis
+
+Partijų apdorojimo kadravimas perkeltas į **Cropper.js 1.7.x** (MIT licencija). Naudojamas tik apkirpimo funkcionalumas, neįtraukiami filtrai, spalvų korekcijos, tekstai, lipdukai ar rėmeliai.
+
+- Baltą kadravimo stačiakampį galima tempti, keisti jo dydį už kampų ir kraštinių.
+- Kadravimo proporcija automatiškai atitinka pasirinktą popieriaus formatą ir konkrečios nuotraukos orientaciją.
+- `viewMode: 1` apriboja kadravimo stačiakampį originalios nuotraukos ribomis.
+- Pelės ratuku galima artinti ir tolinti vaizdą.
+- Atskiras režimas „Perkelti nuotrauką“ leidžia pastumti vaizdą po fiksuotu kadravimo langeliu.
+- Apkirpimo koordinatės saugomos originalios nuotraukos pikselių koordinačių sistemoje ir naudojamos eksportuojant. Todėl peržiūros ir galutinio failo kadravimas remiasi tomis pačiomis koordinatėmis.
+- „Įtalpinti“ režimas išsaugo visą vaizdą ir užpildo laisvą vietą balta spalva.
+- „Real size“ eksportas naudoja pasirinktą formatą ir įvestą DPI; įprastas proporcinis eksportas nenaudoja dirbtinio DPI didinimo.
+
+Diegimas: `npm install` įdiegia Cropper.js kartu su kitomis projekto priklausomybėmis.
