@@ -1,4 +1,4 @@
-# FotoKadravimas v1.4
+# Foto inspektorius v1.5
 
 ## Paleidimas vietoje
 
@@ -11,7 +11,7 @@ npm run dev
 
 Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe/` iš `test` branch per GitHub Actions. Saugyklos `Settings → Pages → Build and deployment → Source` turi būti pasirinkta `GitHub Actions`.
 
-## v1.4 pakeitimai
+## v1.5 pakeitimai
 
 - „Balti kraštai“ pervadinti į „Įtalpinta“. Įtalpinimo režime galima priartinti ir pastumti nuotrauką, kad sumažėtų balti šonai; tai veikia ir pagrindinėje peržiūroje, ir eksporte.
 - Spausdinimo formatas pasirenkamas iš išskleidžiamo sąrašo; rankiniai matmenys automatiškai perjungia formatą į „Pagal skaičius“.
@@ -34,4 +34,12 @@ Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe
 ## Pastaba
 
 Šioje aplinkoje nepavyko įdiegti npm priklausomybių per skirtą laiką, todėl `npm run build` dar nebuvo patikrintas. GitHub Actions atliks build publikavimo metu ir parodys konkrečią klaidą, jei jos liko.
-\n\n## v1.4\n- Fixed fitted-mode thumbnails so the actual photo and white margins render together.\n- Crop and Real Size previews now show the full source image; the area outside the print crop is dimmed.\n
+\n\n## v1.5\n- Fixed fitted-mode thumbnails so the actual photo and white margins render together.\n- Crop and Real Size previews now show the full source image; the area outside the print crop is dimmed.\n
+
+## v1.5
+- App renamed to Foto inspektorius.
+- Removed the original-file note and the thumbnail status legend.
+- Added left/right keyboard navigation.
+- Added JPG and lossless 8-bit TIFF export.
+- Added live crop pixel, print-size, and DPI readouts.
+- Added unconstrained Free crop mode and Apply to all photos for the selected crop mode.
