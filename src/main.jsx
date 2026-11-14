@@ -234,53 +234,28 @@ function renderPhoto(photo, canvas, { thumbnail = false } = {}) {
   ctx.drawImage(photo.image, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
 }
 
-const IQA_MODEL_URL = 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/dbcnn_model.onnx';
-const IQA_DATA_URL = 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/dbcnn_model.onnx.data';
-const IQA_CACHE = 'foto-inspektorius-iqa-dbcnn-v1';
-let dbcnnSessionPromise = null;
-
-async function getCachedModelFile(url, key, onProgress) {
-  const cache = 'caches' in window ? await caches.open(IQA_CACHE) : null;
-  const cacheKey = new Request(`${location.origin}/__iqa_cache__/${key}`);
-  const saved = cache ? await cache.match(cacheKey) : null;
-  if (saved) return saved.blob();
-  const response = await fetch(url, { mode: 'cors' });
-  if (!response.ok) throw new Error(`Nepavyko atsisiųsti AI modelio (${response.status}).`);
-  const total = Number(response.headers.get('content-length')) || 0;
-  if (!response.body) {
-    const blob = await response.blob();
-    if (cache) await cache.put(cacheKey, new Response(blob));
-    return blob;
-  }
-  const reader = response.body.getReader();
-  const chunks = []; let received = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value); received += value.length;
-    onProgress?.(total ? Math.min(99, Math.round(received / total * 100)) : null);
-  }
-  const blob = new Blob(chunks, { type: 'application/octet-stream' });
-  if (cache) await cache.put(cacheKey, new Response(blob));
-  onProgress?.(100);
-  return blob;
-}
-
-async function loadDbcnn(onProgress) {
-  if (!dbcnnSessionPromise) {
-    dbcnnSessionPromise = (async () => {
-      ort.env.wasm.numThreads = Math.min(4, Math.max(1, navigator.hardwareConcurrency || 2));
-      const modelBlob = await getCachedModelFile(IQA_MODEL_URL, 'dbcnn_model.onnx', v => onProgress?.('model', v));
-      const dataBlob = await getCachedModelFile(IQA_DATA_URL, 'dbcnn_model.onnx.data', v => onProgress?.('weights', v));
-      const modelBuffer = await modelBlob.arrayBuffer();
-      return ort.InferenceSession.create(modelBuffer, {
-        executionProviders: ['wasm'],
-        graphOptimizationLevel: 'all',
-        externalData: [{ path: 'dbcnn_model.onnx.data', data: dataBlob }],
-      });
-    })().catch(error => { dbcnnSessionPromise = null; throw error; });
-  }
-  return dbcnnSessionPromise;
+const IQA_MODELS = {
+  dbcnn: { label: 'DBCNN', size: '59 MB', file: 'dbcnn_model.onnx', data: 'dbcnn_model.onnx.data', url: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/dbcnn_model.onnx', dataUrl: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/dbcnn_model.onnx.data' },
+  hyperiqa: { label: 'HyperIQA', size: '105 MB', file: 'hyperiqa_model.onnx', data: 'hyperiqa_model.onnx.data', url: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/hyperiqa_model.onnx', dataUrl: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/hyperiqa_model.onnx.data' },
+  musiq: { label: 'MUSIQ', size: '104 MB', file: 'musiq_model.onnx', data: 'musiq_model.onnx.data', url: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/musiq_model.onnx', dataUrl: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/musiq_model.onnx.data' },
+  maniqa: { label: 'MANIQA', size: '437 MB', file: 'maniqa_model.onnx', url: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/maniqa_model.onnx' },
+  clipiqa: { label: 'CLIPIQA+', size: '146 MB', file: 'clipiqa_model.onnx', data: 'clipiqa_model.onnx.data', url: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/clipiqa_model.onnx', dataUrl: 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/clipiqa_model.onnx.data' },
+};
+const IQA_CACHE = 'foto-inspektorius-iqa-models-v2';
+const iqaSessionPromises = {};
+async function loadIqaModel(id, onProgress) {
+  if (!iqaSessionPromises[id]) iqaSessionPromises[id] = (async () => {
+    const cfg = IQA_MODELS[id];
+    ort.env.wasm.numThreads = Math.min(4, Math.max(1, navigator.hardwareConcurrency || 2));
+    const modelBlob = await getCachedModelFile(cfg.url, cfg.file, v => onProgress?.('model', v));
+    const options = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
+    if (cfg.data) {
+      const dataBlob = await getCachedModelFile(cfg.dataUrl, cfg.data, v => onProgress?.('weights', v));
+      options.externalData = [{ path: cfg.data, data: dataBlob }];
+    }
+    return ort.InferenceSession.create(await modelBlob.arrayBuffer(), options);
+  })().catch(error => { delete iqaSessionPromises[id]; throw error; });
+  return iqaSessionPromises[id];
 }
 
 function imageToDbcnnTensor(image) {
@@ -353,6 +328,9 @@ function App() {
   const [qualityStatus, setQualityStatus] = useState('idle');
   const [qualityProgress, setQualityProgress] = useState('');
   const [qualityResult, setQualityResult] = useState(null);
+  const [qualityCropZoom, setQualityCropZoom] = useState(1);
+  const [qualityPan, setQualityPan] = useState({ x: 0, y: 0 });
+  const [selectedIqaModels, setSelectedIqaModels] = useState(['dbcnn', 'musiq']);
   const qualityFileRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
@@ -654,26 +632,46 @@ function App() {
     } catch (error) { setMessage(`Nepavyko įkelti nuotraukos: ${error.message}`); }
   };
 
+  const makeQualityCrop = () => {
+    if (!qualityImage) return null;
+    const [a,b] = qualityDimensions;
+    const ratio = a / b;
+    const iw = qualityImage.width, ih = qualityImage.height;
+    let cw = iw, ch = ih;
+    if (iw / ih > ratio) cw = ih * ratio; else ch = iw / ratio;
+    cw /= qualityCropZoom; ch /= qualityCropZoom;
+    const maxX = Math.max(0, (iw-cw)/2), maxY = Math.max(0, (ih-ch)/2);
+    const cx = iw/2 + qualityPan.x*maxX, cy = ih/2 + qualityPan.y*maxY;
+    const sx = clamp(cx-cw/2,0,iw-cw), sy = clamp(cy-ch/2,0,ih-ch);
+    const canvas = document.createElement('canvas'); canvas.width=Math.max(1,Math.round(cw)); canvas.height=Math.max(1,Math.round(ch));
+    canvas.getContext('2d').drawImage(qualityImage.image,sx,sy,cw,ch,0,0,canvas.width,canvas.height);
+    return canvas;
+  };
+
   const runQualityAnalysis = async () => {
-    if (!qualityImage || qualityStatus === 'running') return;
-    setQualityStatus('loading'); setQualityProgress('Paruošiamas AI modelis…');
+    if (!qualityImage || qualityStatus === 'running' || !selectedIqaModels.length) return;
+    setQualityStatus('loading'); setQualityProgress('Paruošiamas apkirptas spaudos kadras…');
     try {
-      const session = await loadDbcnn((part, value) => setQualityProgress(`${part === 'model' ? 'AI modelis' : 'Modelio svoriai'}: ${value == null ? 'atsisiunčiama' : `${value}%`}`));
-      setQualityStatus('running'); setQualityProgress('Vykdoma AI analizė…');
-      const inputName = session.inputNames[0];
-      const outputName = session.outputNames[0];
-      const output = await session.run({ [inputName]: imageToDbcnnTensor(qualityImage.image) });
-      const score = Number(output[outputName].data[0]);
-      const grid = calculateSharpnessGrid(qualityImage.image);
-      const [wCm, hCm] = qualityDimensions;
-      const dpiX = qualityImage.width / (wCm / 2.54), dpiY = qualityImage.height / (hCm / 2.54);
-      const weakTiles = grid.filter(tile => tile.weak).length;
-      setQualityResult({ score, grid, dpiX, dpiY, width: qualityImage.width, height: qualityImage.height, weakTiles, analyzedAt: new Date().toISOString() });
-      setQualityStatus('done'); setQualityProgress('Analizė baigta. Nuotrauka apdorota šiame įrenginyje.');
-    } catch (error) {
-      console.error('IQA analysis error:', error);
-      setQualityStatus('error'); setQualityProgress(`AI analizė nepavyko: ${error.message || 'nežinoma klaida'}`);
-    }
+      const cropCanvas = makeQualityCrop();
+      const croppedImage = await new Promise((resolve,reject)=>cropCanvas.toBlob(async blob=>{ if(!blob) return reject(new Error('Nepavyko paruošti apkirpto vaizdo.')); try { const decoded=await blobToImage(blob); resolve(decoded.image); } catch(e){reject(e);} },'image/png'));
+      const results = [];
+      for (let i=0;i<selectedIqaModels.length;i++) {
+        const id=selectedIqaModels[i], cfg=IQA_MODELS[id];
+        setQualityStatus('running');
+        setQualityProgress(`${cfg.label}: ${i+1}/${selectedIqaModels.length}. Modelio paruošimas / atsisiuntimas…`);
+        const session=await loadIqaModel(id,(part,value)=>setQualityProgress(`${cfg.label}: ${part==='model'?'modelis':'svoriai'} ${value==null?'atsisiunčiami':value+'%'}`));
+        setQualityProgress(`${cfg.label}: analizuojamas APKIRPTAS kadras…`);
+        const tensor=imageToDbcnnTensor(croppedImage);
+        const output=await session.run({[session.inputNames[0]]:tensor});
+        const raw=Number(output[session.outputNames[0]].data[0]);
+        results.push({id,label:cfg.label,score:raw});
+      }
+      const grid=calculateSharpnessGrid(croppedImage);
+      const [wCm,hCm]=qualityDimensions;
+      const dpiX=cropCanvas.width/(wCm/2.54), dpiY=cropCanvas.height/(hCm/2.54);
+      setQualityResult({models:results,grid,dpiX,dpiY,width:cropCanvas.width,height:cropCanvas.height,weakTiles:grid.filter(t=>t.weak).length,analyzedAt:new Date().toISOString()});
+      setQualityStatus('done'); setQualityProgress('Analizė baigta. Visi pasirinkti modeliai vertino tik apkirptą spaudos kadrą.');
+    } catch(error) { console.error('IQA analysis error:',error); setQualityStatus('error'); setQualityProgress(`AI analizė nepavyko: ${error.message||'nežinoma klaida'}`); }
   };
 
   const qualityTabView = <main className="quality-workspace">
@@ -686,15 +684,15 @@ function App() {
       <div className="panel-title quality-subtitle">3. Spaudos matmenys (cm)</div>
       {qualityPrintType === 'photo' && <div className="select-wrap"><select value={FORMATS.find(f => f.cm[0] === qualityDimensions[0] && f.cm[1] === qualityDimensions[1])?.id || 'custom'} onChange={e => { const f = FORMATS.find(x => x.id === e.target.value); if (f) setQualityDimensions([...f.cm]); }}>{FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}<option value="custom">Pagal skaičius</option></select></div>}
       <div className="custom-format-fields quality-dimensions"><input type="number" min="1" max="300" step="0.1" value={qualityDimensions[0]} onChange={e => setQualityDimensions([Math.max(1, Number(e.target.value) || 1), qualityDimensions[1]])}/><span>×</span><input type="number" min="1" max="300" step="0.1" value={qualityDimensions[1]} onChange={e => setQualityDimensions([qualityDimensions[0], Math.max(1, Number(e.target.value) || 1)])}/></div>
-      <div className="section-divider"/><div className="model-info"><BrainCircuit size={18}/><div><b>DBCNN AI modelis</b><small>~59 MB · vykdomas naršyklėje · pirmą kartą atsisiunčiamas vieną kartą</small></div></div>
-      <button className="primary quality-run" onClick={runQualityAnalysis} disabled={!qualityImage || ['loading','running'].includes(qualityStatus)}>{['loading','running'].includes(qualityStatus) ? <Loader2 className="spin" size={16}/> : <Sparkles size={16}/>} {qualityStatus === 'done' ? 'Analizuoti dar kartą' : 'Analizuoti nuotrauką'}</button>
+      <div className="section-divider"/><div className="panel-title">4. AI modeliai</div><div className="iqa-model-list">{Object.entries(IQA_MODELS).map(([id,m])=><label key={id}><input type="checkbox" checked={selectedIqaModels.includes(id)} onChange={e=>setSelectedIqaModels(prev=>e.target.checked?[...prev,id]:prev.filter(x=>x!==id))}/><span><b>{m.label}</b><small>{m.size}</small></span></label>)}</div><small className="iqa-note">Galima pasirinkti vieną arba kelis. Pasirinkus kelis, jie vykdomi paeiliui. Visų modelių atsisiuntimas gali viršyti 1 GB.</small><div className="panel-title quality-subtitle">5. Kadravimo priartinimas</div><input type="range" min="1" max="3" step="0.05" value={qualityCropZoom} onChange={e=>setQualityCropZoom(Number(e.target.value))}/><small className="iqa-note">{Math.round(qualityCropZoom*100)}% · keiskite kadro padėtį žemiau</small><label className="iqa-pan">Horizontaliai <input type="range" min="-1" max="1" step="0.01" value={qualityPan.x} onChange={e=>setQualityPan(p=>({...p,x:Number(e.target.value)}))}/></label><label className="iqa-pan">Vertikaliai <input type="range" min="-1" max="1" step="0.01" value={qualityPan.y} onChange={e=>setQualityPan(p=>({...p,y:Number(e.target.value)}))}/></label>
+      <button className="primary quality-run" onClick={runQualityAnalysis} disabled={!qualityImage || !selectedIqaModels.length || ['loading','running'].includes(qualityStatus)}>{['loading','running'].includes(qualityStatus) ? <Loader2 className="spin" size={16}/> : <Sparkles size={16}/>} {qualityStatus === 'done' ? 'Analizuoti dar kartą' : 'Analizuoti nuotrauką'}</button>
       <div className={`quality-progress ${qualityStatus}`}>{qualityProgress || 'Nuotrauka nebus siunčiama į serverį. Analizė vyksta šiame įrenginyje.'}</div>
     </section>
     <section className="quality-preview-panel">
-      <div className="quality-preview-heading"><div><b>Nuotraukos peržiūra</b><span>Visa nuotrauka · preliminarus pirmasis AI bandymas</span></div>{qualityResult && <span className="quality-score">DBCNN: {qualityResult.score.toFixed(1)} / 100</span>}</div>
-      <div className="quality-preview-stage">{qualityImage ? <div className="quality-image-wrap"><img src={qualityImage.url} alt="Įkelta analizuojama nuotrauka"/>{qualityResult && <div className="quality-grid-overlay">{qualityResult.grid.map(tile => <div key={`${tile.x}-${tile.y}`} className={tile.weak ? 'weak' : ''} style={{ left: `${tile.x * 33.333}%`, top: `${tile.y * 33.333}%`, width: '33.333%', height: '33.333%' }}>{tile.weak && <span>Galimas ryškumo trūkumas</span>}</div>)}</div>}</div> : <div className="empty-stage"><Images size={48}/><b>Įkelkite nuotrauką analizei</b><span>Šiame bandyme vertinsime vieną nuotrauką vienu metu.</span><button className="primary" onClick={() => qualityFileRef.current?.click()}><ImagePlus size={17}/> Įkelti nuotrauką</button></div>}</div>
-      {qualityResult && <div className="quality-results"><div className="quality-result-card"><small>AI kokybės balas</small><b>{qualityResult.score.toFixed(1)} / 100</b><span>DBCNN bendras kokybės įvertinimas, ne spaudos garantija</span></div><div className="quality-result-card"><small>Efektyvi raiška</small><b>{Math.round(Math.min(qualityResult.dpiX, qualityResult.dpiY))} DPI</b><span>{qualityResult.width} × {qualityResult.height} px pagal {qualityDimensions.join(' × ')} cm</span></div><div className="quality-result-card"><small>Galimos probleminės sritys</small><b>{qualityResult.weakTiles} / 9</b><span>Kontrasto / detalumo heuristika, ne galutinis fokusavimo nustatymas</span></div></div>}
-      <div className="quality-disclaimer"><AlertTriangle size={15}/> Pirmasis prototipas. DBCNN vertina bendrą suvokiamą kokybę, o pažymėtos sritys nustatomos papildomu vaizdo kontrasto algoritmu. Tai dar nėra patvirtintas spaudos tinkamumo verdiktas.</div>
+      <div className="quality-preview-heading"><div><b>Kadras, kuris bus siunčiamas AI analizei</b><span>Formato proporcijomis apkirptas vaizdas · keiskite priartinimą prieš analizę</span></div>{qualityResult && <span className="quality-score">{qualityResult.models.length} modeliai baigė</span>}</div>
+      <div className="quality-preview-stage">{qualityImage ? <div className="quality-image-wrap quality-crop-wrap" style={{aspectRatio:`${qualityDimensions[0]}/${qualityDimensions[1]}`}}><img src={qualityImage.url} alt="Apkirpimo peržiūra" style={{width:`${qualityCropZoom*100}%`,height:`${qualityCropZoom*100}%`,maxWidth:'none',maxHeight:'none',objectFit:'cover',transform:`translate(${qualityPan.x*25}%,${qualityPan.y*25}%)`}}/>{qualityResult && <div className="quality-grid-overlay">{qualityResult.grid.map(tile => <div key={`${tile.x}-${tile.y}`} className={tile.weak ? 'weak' : ''} style={{ left: `${tile.x * 33.333}%`, top: `${tile.y * 33.333}%`, width: '33.333%', height: '33.333%' }}>{tile.weak && <span>Galimas ryškumo trūkumas</span>}</div>)}</div>}</div> : <div className="empty-stage"><Images size={48}/><b>Įkelkite nuotrauką analizei</b><span>Šiame bandyme vertinsime vieną nuotrauką vienu metu.</span><button className="primary" onClick={() => qualityFileRef.current?.click()}><ImagePlus size={17}/> Įkelti nuotrauką</button></div>}</div>
+      {qualityResult && <><div className="quality-results">{qualityResult.models.map(m=><div className="quality-result-card" key={m.id}><small>{m.label} AI įvertinimas</small><b>{m.score.toFixed(4)}</b><span>Neapdorotas modelio balas. Skirtingų modelių skalės nesulyginamos.</span></div>)}<div className="quality-result-card"><small>Apkirpto kadro raiška</small><b>{Math.round(Math.min(qualityResult.dpiX,qualityResult.dpiY))} DPI</b><span>{qualityResult.width} × {qualityResult.height} px pagal {qualityDimensions.join(' × ')} cm</span></div><div className="quality-result-card"><small>Galimos silpnesnės sritys</small><b>{qualityResult.weakTiles} / 9</b><span>Lokali ryškumo heuristika</span></div></div></>}
+      <div className="quality-disclaimer"><AlertTriangle size={15}/> Pirmasis prototipas. Pasirinkti NR-IQA modeliai vertina apkirptą kadrą. Jų balai yra skirtingų skalių, todėl tiesiogiai tarpusavyje nelyginami. Pažymėtos sritys nustatomos papildomu vaizdo ryškumo algoritmu. Tai dar nėra patvirtintas spaudos tinkamumo verdiktas.</div>
     </section>
     <input ref={qualityFileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,image/*" hidden onChange={e => { loadQualityImage(e.target.files?.[0]); e.target.value = ''; }}/>
   </main>;

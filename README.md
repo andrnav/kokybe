@@ -1,103 +1,34 @@
-# Foto inspektorius v1.5
+# Foto inspektorius v2.0.2 – naršyklės AI bandymas
 
-## Paleidimas vietoje
+Atskira eksperimentinė versija. Originali v2.0.1 nepakeista.
+
+## Paleidimas
 
 ```bash
 npm install
 npm run dev
 ```
 
-## GitHub Pages
+## AI kokybės analizė
 
-Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe/` iš `test` branch per GitHub Actions. Saugyklos `Settings → Pages → Build and deployment → Source` turi būti pasirinkta `GitHub Actions`.
+Nuotrauka įkeliama, parenkamas spaudos formatas, nustatomas kadro priartinimas ir horizontali / vertikali padėtis. Analizės metu iš šio kadro sukuriamas atskiras PNG, ir būtent jis perduodamas pasirinktiems ONNX NR-IQA modeliams.
 
-## v1.5 pakeitimai
+Galima pasirinkti vieną ar kelis modelius:
+- DBCNN (~59 MB)
+- HyperIQA (~105 MB)
+- MUSIQ (~104 MB)
+- MANIQA (~437 MB)
+- CLIPIQA+ (~146 MB)
 
-- „Balti kraštai“ pervadinti į „Įtalpinta“. Įtalpinimo režime galima priartinti ir pastumti nuotrauką, kad sumažėtų balti šonai; tai veikia ir pagrindinėje peržiūroje, ir eksporte.
-- Spausdinimo formatas pasirenkamas iš išskleidžiamo sąrašo; rankiniai matmenys automatiškai perjungia formatą į „Pagal skaičius“.
-- Pašalintas dešinysis informacijos skydelis ir didinimo mygtukas, todėl pagrindinė peržiūra platesnė.
-- „Atsisiųsti šią nuotrauką“ perkeltas šalia „Atstatyti“.
-- Apatinė nuotraukų juosta slenkama pelės ratuku horizontaliai.
-- Prie failo pavadinimo pridėtas kopijų skaičius. Kai skaičius didesnis nei 1, eksportuojamo failo pavadinimas prasideda, pvz., „2x - “.
+Modeliai atsisiunčiami iš Hugging Face pirmo panaudojimo metu ir laikomi naršyklės Cache Storage. Keli pasirinkti modeliai vykdomi paeiliui, kad nereikėtų vienu metu laikyti visų modelių aktyvioje RAM.
 
-## v1.2 pakeitimai
+**Svarbūs apribojimai:**
+- Visų penkių modelių failai kartu sudaro apie 851 MB, papildomai gali reikėti atminties vykdymui.
+- NR-IQA modelių balai yra skirtingų skalių ir negali būti tiesiogiai lyginami ar vidurkinami.
+- Ši versija rodo kiekvieno modelio neapdorotą balą atskirai.
+- Kadravimo sąsaja naudoja spaudos formato proporciją, priartinimą ir X/Y padėties slankiklius.
+- Šis prototipas nėra patvirtintas spaudos tinkamumo verdiktas. Reikia realių nuotraukų testų ir modelių išvesties / preprocessing patikros.
+- Šiuo metu modelių ONNX failų suderinamumas ir inferencija konkrečioje naršyklėje dar nėra patikrinti šiame kūrimo konteineryje.
 
-- „Balti kraštai“ pagrindiniame peržiūros lange rodomi tikrame pasirinkto formato baltame lape.
-- Balto lapo proporcija apskaičiuojama iš pasirinktų centimetrų, o nuotrauka įtalpinama nekeičiant jos proporcijų.
-- Kadravimo peržiūroje nuotrauka rodoma tik pasirinkto formato rėmelio viduje; išorė pritemdoma.
-- Pridėtas rankinis formato įvedimas centimetrais. Pakeitus bent vieną matmenį, formatas tampa „Pagal skaičius“.
-- Pašalintas „Patvirtinti“ mygtukas. Pereinant prie kitos nuotraukos, ankstesnė pažymima kaip peržiūrėta; eksportuojant pažymima visa partija.
-- Paliktas „Atstatyti“ mygtukas, kuris grąžina automatinę orientaciją, mastelį ir centrinį kadravimą.
-- Apatinės miniatiūros rodo būsimą eksportuojamą vaizdą, įskaitant baltus kraštus.
-- Originalūs įkelti failai nekeičiami.
-
-## Pastaba
-
-Šioje aplinkoje nepavyko įdiegti npm priklausomybių per skirtą laiką, todėl `npm run build` dar nebuvo patikrintas. GitHub Actions atliks build publikavimo metu ir parodys konkrečią klaidą, jei jos liko.
-\n\n## v1.5\n- Fixed fitted-mode thumbnails so the actual photo and white margins render together.\n- Crop and Real Size previews now show the full source image; the area outside the print crop is dimmed.\n
-
-## v1.5
-- App renamed to Foto inspektorius.
-- Removed the original-file note and the thumbnail status legend.
-- Added left/right keyboard navigation.
-- Added JPG and lossless 8-bit TIFF export.
-- Added live crop pixel, print-size, and DPI readouts.
-- Added unconstrained Free crop mode and Apply to all photos for the selected crop mode.
-
-
-## v1.7
-- Preview positioning now derives directly from the same source-pixel crop rectangle used by export.
-- Added print-size-aware resolution grading (editable DPI/PPI targets).
-- Added quality threshold settings with browser persistence and JSON import/export.
-- Added quality status beside pixel dimensions and effective resolution.
-
-
-## v1.7 – crop/export synchronization and quality scoring
-
-- Crop preview now derives image placement from the exact source-pixel crop rectangle used by the export canvas.
-- Dragging the photo right moves the displayed photo right; the exported crop corresponds to the visible crop window.
-- Added a visible print-quality rating beside pixel dimensions and DPI.
-- Added editable quality thresholds in the settings dialog. Values are saved in browser local storage.
-- Quality thresholds are interpolated by the print's longest side. The rating uses the lower of horizontal and vertical effective source DPI.
-- Real Size output remains 320 DPI, while its quality rating uses the original source crop resolution before upscaling.
-
-
-## v1.8 – laisvas kadravimas ir nuotraukų eilės patobulinimai
-
-- „Laisvas“ režimas naudoja nepriklausomą apkirpimo stačiakampį, kuris pradžioje apima visą originalią nuotrauką.
-- Laisvo kadro proporcija nepririšta prie spausdinimo formato. Stačiakampį galima keisti tempiant jo apatinį dešinį kampą, o nuotrauką – stumdyti kadro viduje.
-- Spausdinimo formato pasirinkimas ir rankiniai matmenys išjungiami „Laisvas“ režime. Kiti režimai vėl naudoja pasirinktą formatą.
-- Pikseliai, DPI ir kokybės įvertinimas perkeltas šalia failo pavadinimo.
-- Kopijų kiekio valdiklis perkeltas į kiekvienos nuotraukos kortelę apačioje, po miniatiūra ir failo pavadinimu.
-
-
-## v1.9 – HEIC/HEIF ir PDF palaikymas
-
-- HEIC ir HEIF failai konvertuojami į PNG naršyklėje; jei konverteris nepavyksta, bandomas naršyklės vietinis dekodavimas.
-- Įkeliant PDF kiekvienas puslapis atskirai atvaizduojamas į PNG (3× PDF puslapio masteliu) ir įtraukiamas į bendrą nuotraukų eilę.
-- PDF puslapių failų pavadinimai gauna puslapio numerį, pvz. `Dokumentas - 001.png`.
-- Originalus HEIC/HEIF arba PDF failas nekeičiamas. Eksportuojamos tik apdorotos nuotraukų kopijos.
-- Nepavykus įkelti failo, pranešime parodomas konkretus failo pavadinimas ir klaidos priežastis.
-
-
-## v1.9.1 – HEIC dekoderio atnaujinimas
-
-- Pašalinta pasenusi `heic2any` biblioteka (0.0.4), kuri naudojo senesnį libheif ir atmesdavo dalį naujesnių HEIC kodavimo variantų.
-- Naudojama `heic-to` 1.6.7, paremta naujesniu libheif 1.23.7.
-- HEIC/HEIF konvertuojamas į PNG naršyklėje. PDF apdorojimo kodas nepakeistas.
-- Jei HEIC nepavyksta perskaityti, klaidos pranešime atskirai pateikiama dekoderio ir naršyklės klaida.
-
-## v2.0.2 – eksperimentinis naršyklės AI kokybės vertinimas
-
-- Įjungtas atskiras „Nuotraukos kokybė“ skirtukas. Jis priima vieną nuotrauką, leidžia pasirinkti spaudos tipą ir matmenis.
-- Pridėtas DBCNN no-reference IQA modelis per `onnxruntime-web`. Modelis vykdomas naršyklėje, naudojant WebAssembly CPU vykdymo aplinką.
-- Modelio failas ir svoriai pirmo naudojimo metu atsisiunčiami iš Hugging Face ir išsaugomi naršyklės Cache API talpykloje.
-- Papildomai rodoma 3×3 vietinė kontrasto / detalumo heuristika. Pažymėjimai nėra patvirtintas fokusavimo ar spaudos tinkamumo nustatymas.
-- Nuotraukos analizės metu nesiunčiamos į mūsų serverį. Modelio atsisiuntimui pirmą kartą reikalingas internetas.
-
-### Eksperimentinio AI apribojimai
-
-- Ši versija vertina visą įkeltą nuotrauką. Kadravimo sąsaja ir analizė tiksliai apkirptam plotui bus integruojama kitame etape.
-- DBCNN yra bendras suvokiamos kokybės vertintojas, o ne specializuotas spaudos fokusavimo diagnostikos modelis.
-- Balas nėra DPI ar spaudos kokybės procentas. Jį būtina kalibruoti su realiais spaudos pavyzdžiais.
-- Jei Hugging Face modelio failai nepasiekiami arba naršyklė neleidžia jų atsisiųsti, AI analizė parodys klaidą; įprastas kadravimo skirsnis nuo to nepriklauso.
+Modelių ONNX eksportai: https://huggingface.co/86Cao/IQA-ONNX-Models
+Originalūs modeliai turi atskiras publikacijas ir licencijų sąlygas. Prieš komercinį diegimą būtina patikrinti kiekvieno svorių rinkinio licenciją.
