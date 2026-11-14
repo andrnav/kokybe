@@ -1,22 +1,21 @@
-# FotoKadravimas v1
+# FotoKadravimas v1.1
 
-React + Vite nuotraukų kadravimo aplikacija.
-
-## Paleidimas lokaliai
+## Paleidimas vietoje
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Publikavimas GitHub Pages
+## GitHub Pages
 
-Šis projektas paruoštas adresui `https://andrnav.github.io/kokybe/` ir `test` branch.
+Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe/` iš `test` branch per GitHub Actions. Saugyklos `Settings → Pages → Build and deployment → Source` turi būti pasirinkta `GitHub Actions`.
 
-1. Įkelkite visą projekto turinį į `kokybe` saugyklos `test` branch, įskaitant paslėptą `.github` aplanką.
-2. GitHub atidarykite **Settings → Pages**.
-3. Skiltyje **Build and deployment → Source** pasirinkite **GitHub Actions**. **Nesirinkite „Deploy from a branch“**, nes tada GitHub pateiks neapdorotą `index.html` ir naršyklė bandys vykdyti JSX failą tiesiogiai.
-4. Atidarykite **Actions** ir paleiskite arba palaukite „Deploy FotoKadravimas to GitHub Pages“ veiksmą. Jis turi baigtis žalia varnele.
-5. Tik tada atidarykite `https://andrnav.github.io/kokybe/`.
+## Šios versijos pakeitimai
 
-Kiekvienas naujas pakeitimas `test` branch automatiškai paleis naują publikavimą.
+- Viena kadravimo geometrija naudojama pagrindinei peržiūrai, miniatiūroms ir JPEG eksportui.
+- Pasirinktas formatas visada išlaiko tikslią proporciją, nepriklausomai nuo peržiūros lango dydžio.
+- Nuotrauka pritaikoma pagal tikrą jos proporciją, o ne ištempiama iki lango dydžio.
+- Kadravimo pradžia centruojama, o nuotrauką galima stumdyti ir priartinti.
+- Apatinės miniatiūros rodo jau apkirptą rezultatą. Būsenos žymimos miniatiūros rėmelio spalva, be žalio burbulo.
+- Originalūs failai nekeičiami.
