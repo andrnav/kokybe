@@ -77,3 +77,26 @@
 
 .mode-list{grid-template-columns:repeat(2,minmax(0,1fr))}
 .mode{height:72px}
+
+/* v1.7: visible print-quality rating and editable quality thresholds */
+.quality-indicator{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;font-weight:600}
+.quality-indicator.good{color:#8ee0b1;background:#143326}
+.quality-indicator.fair{color:#b8d98b;background:#2a321e}
+.quality-indicator.warning{color:#f2c46d;background:#3b2d16}
+.quality-indicator.bad{color:#ff9292;background:#421f25}
+.quality-indicator.neutral{color:#aab5c5;background:#252d39}
+.settings-backdrop{position:fixed;inset:0;z-index:1000;background:#05080dcc;display:flex;align-items:center;justify-content:center;padding:20px}
+.quality-settings{width:min(620px,96vw);max-height:90vh;overflow:auto;background:#1a212c;border:1px solid #394454;border-radius:14px;padding:20px;box-shadow:0 24px 80px #000b}
+.settings-heading{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px}
+.settings-heading b{display:block;font-size:16px;color:#edf3fb}
+.settings-heading small{display:block;color:#9aa8ba;margin-top:5px;font-size:11px}
+.settings-heading button{border:0;background:transparent;color:#aeb9c8;font-size:20px}
+.quality-table-head,.quality-table-row{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px;align-items:center}
+.quality-table-head{color:#93a2b6;font-size:10px;padding:0 8px 8px}
+.quality-table-row{padding:7px 8px;border-top:1px solid #303a48;color:#dce5f0;font-size:12px}
+.quality-table-row input{width:100%;min-width:0;background:#111822;border:1px solid #3b4758;border-radius:6px;color:#eef4fc;padding:7px}
+.settings-note{font-size:11px;line-height:1.5;color:#9baabd;margin:14px 0}
+.settings-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:16px}
+.settings-actions button{padding:9px 13px;border-radius:7px;border:1px solid #3a4657}
+.settings-actions .primary{background:#237be5;border-color:#237be5;color:white}
+@media(max-width:600px){.quality-table-head,.quality-table-row{grid-template-columns:1fr .8fr .8fr;gap:6px}.quality-table-row{font-size:10px}.settings-actions{flex-wrap:wrap}}

@@ -45,8 +45,18 @@ Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe
 - Added unconstrained Free crop mode and Apply to all photos for the selected crop mode.
 
 
-## v1.6
+## v1.7
 - Preview positioning now derives directly from the same source-pixel crop rectangle used by export.
 - Added print-size-aware resolution grading (editable DPI/PPI targets).
 - Added quality threshold settings with browser persistence and JSON import/export.
 - Added quality status beside pixel dimensions and effective resolution.
+
+
+## v1.7 – crop/export synchronization and quality scoring
+
+- Crop preview now derives image placement from the exact source-pixel crop rectangle used by the export canvas.
+- Dragging the photo right moves the displayed photo right; the exported crop corresponds to the visible crop window.
+- Added a visible print-quality rating beside pixel dimensions and DPI.
+- Added editable quality thresholds in the settings dialog. Values are saved in browser local storage.
+- Quality thresholds are interpolated by the print's longest side. The rating uses the lower of horizontal and vertical effective source DPI.
+- Real Size output remains 320 DPI, while its quality rating uses the original source crop resolution before upscaling.

@@ -12,6 +12,25 @@ const FORMATS = [
   { id: '15x15', label: '15 × 15 cm', ratioLabel: '1:1', cm: [15, 15] },
   { id: 'a4', label: 'A4', ratioLabel: '21 × 29,7 cm', cm: [21, 29.7] },
 ];
+const DEFAULT_QUALITY_SCALE = [
+  { id: '10x15', label: '10 × 15 cm', size: 15, dpi: 200 },
+  { id: '20x30', label: '20 × 30 cm', size: 30, dpi: 180 },
+  { id: '30x40', label: '30 × 40 cm', size: 40, dpi: 160 },
+  { id: '40x60', label: '40 × 60 cm', size: 60, dpi: 140 },
+  { id: '60x90', label: '60 × 90 cm', size: 90, dpi: 120 },
+  { id: '120x90', label: '120 × 90 cm', size: 120, dpi: 100 },
+  { id: '150x100', label: '150 × 100 cm', size: 150, dpi: 90 },
+];
+const getTargetDpi = (longSideCm, scale) => {
+  const rows = [...scale].sort((a, b) => a.size - b.size);
+  if (longSideCm <= rows[0].size) return rows[0].dpi;
+  if (longSideCm >= rows[rows.length - 1].size) return rows[rows.length - 1].dpi;
+  for (let i = 0; i < rows.length - 1; i++) {
+    const l = rows[i], r = rows[i + 1];
+    if (longSideCm >= l.size && longSideCm <= r.size) return l.dpi + (r.dpi - l.dpi) * ((longSideCm - l.size) / (r.size - l.size));
+  }
+  return rows[0].dpi;
+};
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 const round1 = n => Math.round(n * 10) / 10;
@@ -62,8 +81,8 @@ function getCrop(photo) {
     const zoom = clamp(Number(photo.zoom || 1), 1, 4);
     const sw = photo.width / zoom, sh = photo.height / zoom;
     const maxX = Math.max(0, (photo.width - sw) / 2), maxY = Math.max(0, (photo.height - sh) / 2);
-    const cx = photo.width / 2 + clamp(Number(photo.pan?.x || 0), -1, 1) * maxX;
-    const cy = photo.height / 2 + clamp(Number(photo.pan?.y || 0), -1, 1) * maxY;
+    const cx = photo.width / 2 - clamp(Number(photo.pan?.x || 0), -1, 1) * maxX;
+    const cy = photo.height / 2 - clamp(Number(photo.pan?.y || 0), -1, 1) * maxY;
     return { sx: cx - sw / 2, sy: cy - sh / 2, sw, sh, baseW: photo.width, baseH: photo.height, target: photo.width / photo.height };
   }
   const target = getTargetRatio(photo);
@@ -74,8 +93,8 @@ function getCrop(photo) {
   const zoom = clamp(Number(photo.zoom || 1), 1, photo.mode === 'free' ? 4 : 3);
   const sw = baseW / zoom, sh = baseH / zoom;
   const maxX = Math.max(0, (iw - sw) / 2), maxY = Math.max(0, (ih - sh) / 2);
-  const cx = iw / 2 + clamp(Number(photo.pan?.x || 0), -1, 1) * maxX;
-  const cy = ih / 2 + clamp(Number(photo.pan?.y || 0), -1, 1) * maxY;
+  const cx = iw / 2 - clamp(Number(photo.pan?.x || 0), -1, 1) * maxX;
+  const cy = ih / 2 - clamp(Number(photo.pan?.y || 0), -1, 1) * maxY;
   return { sx: cx - sw / 2, sy: cy - sh / 2, sw, sh, baseW, baseH, target };
 }
 function renderPhoto(photo, canvas, { thumbnail = false } = {}) {
@@ -137,6 +156,8 @@ function App() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [qualityScale, setQualityScale] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('foto-inspektorius-quality-scale')); return Array.isArray(saved) && saved.length ? saved : DEFAULT_QUALITY_SCALE; } catch { return DEFAULT_QUALITY_SCALE; } });
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
   const [stageSizes, setStageSizes] = useState({ main: { w: 900, h: 420 } });
@@ -153,6 +174,7 @@ function App() {
     if (active) { setZoom(active.zoom ?? 1); setPan(active.pan || { x: 0, y: 0 }); setMode(active.mode || 'crop'); setFormat(active.format || format); setCustomCm(active.customCm || customCm); }
   }, [activeId]);
   useEffect(() => () => photos.forEach(p => URL.revokeObjectURL(p.url)), []);
+  useEffect(() => { localStorage.setItem('foto-inspektorius-quality-scale', JSON.stringify(qualityScale)); }, [qualityScale]);
   useEffect(() => {
     const node = stageRef.current;
     if (!node) return;
@@ -277,25 +299,24 @@ function App() {
 
   const metrics = active ? (() => {
     const crop = getCrop(active);
-    let widthPx = Math.max(1, Math.round(crop.sw));
-    let heightPx = Math.max(1, Math.round(crop.sh));
-    if (selectedMode === 'free') return { widthPx, heightPx, size: 'Laisvas', dpi: 'Neskaičiuojamas be spausdinimo matmens' };
+    let widthPx = Math.max(1, Math.round(crop.sw)), heightPx = Math.max(1, Math.round(crop.sh));
+    if (selectedMode === 'free') return { widthPx, heightPx, size: 'Laisvas formatas', dpi: '—', quality: 'Nevertinama', qualityClass: 'neutral', targetDpi: null };
     const [a, b] = getFormat(active).cm;
     const portrait = getOrientation(active);
     const wCm = portrait ? a : b, hCm = portrait ? b : a;
+    let dpiX, dpiY;
     if (selectedMode === 'real') {
-      widthPx = Math.round(wCm / 2.54 * 320);
-      heightPx = Math.round(hCm / 2.54 * 320);
-      return { widthPx, heightPx, size: `${wCm} × ${hCm} cm`, dpi: '320 × 320 DPI' };
+      // Export is resampled to 320 DPI, but quality must reflect source pixels before upscaling.
+      dpiX = crop.sw / (wCm / 2.54); dpiY = crop.sh / (hCm / 2.54);
+      widthPx = Math.round(wCm / 2.54 * 320); heightPx = Math.round(hCm / 2.54 * 320);
+    } else {
+      if (selectedMode === 'fit') { const target = getTargetRatio(active); widthPx = Math.max(active.width, Math.ceil(active.height * target)); heightPx = Math.max(active.height, Math.ceil(active.width / target)); }
+      dpiX = widthPx / (wCm / 2.54); dpiY = heightPx / (hCm / 2.54);
     }
-    if (selectedMode === 'fit') {
-      const target = getTargetRatio(active);
-      widthPx = Math.max(active.width, Math.ceil(active.height * target));
-      heightPx = Math.max(active.height, Math.ceil(active.width / target));
-    }
-    const dpiX = Math.round(widthPx / (wCm / 2.54));
-    const dpiY = Math.round(heightPx / (hCm / 2.54));
-    return { widthPx, heightPx, size: `${wCm} × ${hCm} cm`, dpi: `${dpiX} × ${dpiY} DPI` };
+    const targetDpi = getTargetDpi(Math.max(wCm, hCm), qualityScale), ratio = Math.min(dpiX, dpiY) / targetDpi;
+    const quality = ratio >= 1 ? 'Puiki' : ratio >= .85 ? 'Gera' : ratio >= .65 ? 'Ribinė' : 'Prasta';
+    const qualityClass = ratio >= 1 ? 'good' : ratio >= .85 ? 'fair' : ratio >= .65 ? 'warning' : 'bad';
+    return { widthPx, heightPx, size: `${wCm} × ${hCm} cm`, dpi: `${Math.round(dpiX)} × ${Math.round(dpiY)} DPI`, quality, qualityClass, targetDpi: Math.round(targetDpi) };
   })() : null;
 
   const renderStage = () => {
@@ -303,22 +324,25 @@ function App() {
     let sheetStyle = {}, imageStyle = {};
     if (active) {
       const target = getTargetRatio(active);
-      const sheetW = Math.min(stageW * 0.88, stageH * 0.82 * target);
-      const sheetH = sheetW / target;
+      const sheetW = Math.min(stageW * 0.88, stageH * 0.82 * target), sheetH = sheetW / target;
       sheetStyle = { width: sheetW, height: sheetH };
-      const baseScale = selectedMode === 'fit'
-        ? Math.min(sheetW / active.width, sheetH / active.height)
-        : Math.max(sheetW / active.width, sheetH / active.height);
-      const renderedW = active.width * baseScale, renderedH = active.height * baseScale;
-      const maxX = Math.max(0, (renderedW * zoom - sheetW) / 2);
-      const maxY = Math.max(0, (renderedH * zoom - sheetH) / 2);
-      imageStyle = { width: renderedW, height: renderedH, left: `calc(50% + ${pan.x * maxX}px)`, top: `calc(50% + ${pan.y * maxY}px)`, transform: `translate(-50%, -50%) scale(${zoom})`, objectFit: 'fill' };
+      if (selectedMode === 'fit') {
+        const fitScale = Math.min(sheetW / active.width, sheetH / active.height);
+        const drawW = active.width * fitScale * zoom, drawH = active.height * fitScale * zoom;
+        const maxX = Math.max(0, (drawW - sheetW) / 2), maxY = Math.max(0, (drawH - sheetH) / 2);
+        imageStyle = { width: drawW, height: drawH, left: `calc(50% + ${pan.x * maxX}px)`, top: `calc(50% + ${pan.y * maxY}px)`, transform: 'translate(-50%, -50%)', objectFit: 'fill' };
+      } else {
+        // Identical source crop coordinates are used by the preview and exported canvas.
+        const crop = getCrop(active), scale = Math.min(sheetW / crop.sw, sheetH / crop.sh);
+        const cx = crop.sx + crop.sw / 2, cy = crop.sy + crop.sh / 2;
+        imageStyle = { width: active.width * scale, height: active.height * scale, left: `calc(50% + ${(active.width / 2 - cx) * scale}px)`, top: `calc(50% + ${(active.height / 2 - cy) * scale}px)`, transform: 'translate(-50%, -50%)', objectFit: 'fill' };
+      }
     }
     const getMoveLimits = () => {
-      const target = getTargetRatio(active);
-      const sheetW = Math.min(stageW * 0.88, stageH * 0.82 * target), sheetH = sheetW / target;
-      const baseScale = selectedMode === 'fit' ? Math.min(sheetW / active.width, sheetH / active.height) : Math.max(sheetW / active.width, sheetH / active.height);
-      return { maxX: Math.max(1, (active.width * baseScale * zoom - sheetW) / 2), maxY: Math.max(1, (active.height * baseScale * zoom - sheetH) / 2) };
+      const target = getTargetRatio(active), sheetW = Math.min(stageW * 0.88, stageH * 0.82 * target), sheetH = sheetW / target;
+      if (selectedMode === 'fit') { const scale = Math.min(sheetW / active.width, sheetH / active.height) * zoom; return { maxX: Math.max(1, (active.width * scale - sheetW) / 2), maxY: Math.max(1, (active.height * scale - sheetH) / 2) }; }
+      const crop = getCrop(active), scale = Math.min(sheetW / crop.sw, sheetH / crop.sh);
+      return { maxX: Math.max(1, (active.width - crop.sw) / 2 * scale), maxY: Math.max(1, (active.height - crop.sh) / 2 * scale) };
     };
     const pointerDown = e => {
       if (!active || e.target.closest('.zoom-control')) return;
@@ -344,16 +368,26 @@ function App() {
 
   const currentFormatId = active?.format || format;
   return <div className="app-shell">
-    <header className="topbar"><div className="brand"><div className="brand-icon"><Camera size={21}/></div><span>Foto inspektorius</span></div><nav className="tabs"><button className="tab active"><Crop size={17}/> Kadravimas</button><button className="tab disabled" title="Šis skirsnis bus kuriamas vėliau"><Images size={17}/> Nuotraukos kokybė</button></nav><div className="top-actions"><span className="batch-count">{photos.length ? `Nuotraukų partija · ${photos.length} fail.` : 'Nauja nuotraukų partija'}</span><button className="icon-button" title="Nustatymai"><Settings2 size={19}/></button><button className="download-button" onClick={exportAll} disabled={!photos.length || busy}><Download size={17}/> Atsisiųsti viską <span className="zip-pill">ZIP</span></button></div></header>
+    <header className="topbar"><div className="brand"><div className="brand-icon"><Camera size={21}/></div><span>Foto inspektorius</span></div><nav className="tabs"><button className="tab active"><Crop size={17}/> Kadravimas</button><button className="tab disabled" title="Šis skirsnis bus kuriamas vėliau"><Images size={17}/> Nuotraukos kokybė</button></nav><div className="top-actions"><span className="batch-count">{photos.length ? `Nuotraukų partija · ${photos.length} fail.` : 'Nauja nuotraukų partija'}</span><button className="icon-button" title="Kokybės nustatymai" onClick={() => setSettingsOpen(true)}><Settings2 size={19}/></button><button className="download-button" onClick={exportAll} disabled={!photos.length || busy}><Download size={17}/> Atsisiųsti viską <span className="zip-pill">ZIP</span></button></div></header>
     <main className="workspace">
       <aside className="left-panel"><div className="panel-title">1. Spausdinimo formatas</div><div className="select-wrap format-select"><select value={currentFormatId} onChange={e => changeFormat(e.target.value)}>{FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}<option value="custom">Pagal skaičius</option></select></div>
         <div className="custom-format"><div className="custom-format-title">Rankinis formatas</div><div className="custom-format-fields"><input aria-label="Pirmas matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[0]} onChange={e => changeCustom(0, e.target.value)}/><span>×</span><input aria-label="Antras matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[1]} onChange={e => changeCustom(1, e.target.value)}/></div></div>
         <div className="section-divider"/><div className="panel-title">2. Kadravimo tipas</div><div className="mode-list"><button className={selectedMode === 'crop' ? 'mode selected' : 'mode'} onClick={() => { setMode('crop'); if (active) patchActive({ mode: 'crop' }); }}><Crop/><span>Kadravimas</span></button><button className={selectedMode === 'fit' ? 'mode selected' : 'mode'} onClick={() => { setMode('fit'); if (active) patchActive({ mode: 'fit' }); }}><Square/><span>Įtalpinta</span></button><button className={selectedMode === 'real' ? 'mode selected' : 'mode'} onClick={() => { setMode('real'); if (active) patchActive({ mode: 'real' }); }}><Ruler/><span>Real Size<small>320 DPI</small></span></button><button className={selectedMode === 'free' ? 'mode selected' : 'mode'} onClick={() => { setMode('free'); if (active) patchActive({ mode: 'free', zoom: 1, pan: { x: 0, y: 0 } }); }}><Crop/><span>Laisvas</span></button></div><button className="apply-all-button" onClick={() => applyModeToAll(selectedMode)} disabled={!photos.length}>Taikyti visoms nuotraukoms</button>
         <div className="section-divider"/><div className="panel-title">3. Eksportas</div><div className="select-wrap"><select value={exportFormat} onChange={e => setExportFormat(e.target.value)}><option value="jpg">JPG</option><option value="tif">TIFF · 8 bitų · Lossless</option></select></div></aside>
       <section className="editor-column"><div className="editor-toolbar"><div className="photo-title-group"><div className="photo-name">{active?.name || 'Nuotrauka nepasirinkta'}</div>{active && <div className="copies-control"><button onClick={() => patchActive({ copies: Math.max(1, (active.copies || 1) - 1) })} disabled={(active.copies || 1) <= 1}>−</button><b>{active.copies || 1}</b><button onClick={() => patchActive({ copies: Math.min(99, (active.copies || 1) + 1) })}>＋</button></div>}</div><div className="editor-nav"><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i > 0) navigateTo(photos[i - 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === 0}><ChevronLeft size={17}/> Ankstesnė</button><span>{active ? `${photos.findIndex(p => p.id === activeId) + 1} iš ${photos.length}` : '0 iš 0'}</span><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i < photos.length - 1) navigateTo(photos[i + 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === photos.length - 1}>Kita <ChevronRight size={17}/></button></div></div>
-        {renderStage()}<div className="editor-footer"><div className="orientation-control"><span>Orientacija</span><div className="segmented"><button className={selectedOrientation === 'auto' ? 'active' : ''} onClick={() => patchActive({ orientation: 'auto' })}>Automatinė</button><button className={selectedOrientation === 'vertical' ? 'active' : ''} onClick={() => patchActive({ orientation: 'vertical' })}>Vertikali</button><button className={selectedOrientation === 'horizontal' ? 'active' : ''} onClick={() => patchActive({ orientation: 'horizontal' })}>Horizontali</button></div></div><div className="image-metrics">{metrics && <><span><b>{metrics.widthPx.toLocaleString('lt-LT')} × {metrics.heightPx.toLocaleString('lt-LT')} px</b></span><span>{metrics.size}</span><span><b>{metrics.dpi}</b></span></>}</div><div className="footer-actions"><button className="secondary" onClick={reset} disabled={!active}><RotateCcw size={16}/> Atstatyti</button><button className="secondary" onClick={exportCurrent} disabled={!active}><Download size={16}/> Atsisiųsti šią nuotrauką</button></div></div></section>
+        {renderStage()}<div className="editor-footer"><div className="orientation-control"><span>Orientacija</span><div className="segmented"><button className={selectedOrientation === 'auto' ? 'active' : ''} onClick={() => patchActive({ orientation: 'auto' })}>Automatinė</button><button className={selectedOrientation === 'vertical' ? 'active' : ''} onClick={() => patchActive({ orientation: 'vertical' })}>Vertikali</button><button className={selectedOrientation === 'horizontal' ? 'active' : ''} onClick={() => patchActive({ orientation: 'horizontal' })}>Horizontali</button></div></div><div className="image-metrics">{metrics && <><span><b>{metrics.widthPx.toLocaleString('lt-LT')} × {metrics.heightPx.toLocaleString('lt-LT')} px</b></span><span>{metrics.size}</span><span><b>{metrics.dpi}</b></span><span className={`quality-indicator ${metrics.qualityClass}`} title={metrics.targetDpi ? `Tikslas: ${metrics.targetDpi} DPI` : 'Laisvam formatui kokybė pagal spaudos dydį neskaičiuojama'}>Kokybė: <b>{metrics.quality}</b></span></>}</div><div className="footer-actions"><button className="secondary" onClick={reset} disabled={!active}><RotateCcw size={16}/> Atstatyti</button><button className="secondary" onClick={exportCurrent} disabled={!active}><Download size={16}/> Atsisiųsti šią nuotrauką</button></div></div></section>
     </main>
     <section className="filmstrip"><div className="strip-head"><div><b>Nuotraukų eilė</b><span>{photos.length} nuotraukos</span></div><div className="strip-tools"><button onClick={() => fileRef.current?.click()}><ImagePlus size={16}/> Pridėti</button><button onClick={() => { photos.forEach(p => URL.revokeObjectURL(p.url)); setPhotos([]); setActiveId(null); }}>Išvalyti partiją</button></div></div><div className="strip-body"><button className="strip-arrow" onClick={() => stripRef.current?.scrollBy({ left: -240, behavior: 'smooth' })}><ChevronLeft/></button><div className="thumb-list" ref={stripRef} onWheel={e => { if (stripRef.current) { e.preventDefault(); stripRef.current.scrollLeft += Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX; } }}>{photos.map((p, i) => <button key={p.id} className={`thumb ${p.id === activeId ? 'active' : ''}`} onClick={() => navigateTo(p.id)}><div className={`thumb-image status-${p.status}`}><img src={thumbSources.get(p.id) || p.url} /></div><span className="thumb-label">{String(i + 1).padStart(2, '0')}</span></button>)}</div><button className="strip-arrow" onClick={() => stripRef.current?.scrollBy({ left: 240, behavior: 'smooth' })}><ChevronRight/></button></div><div className="strip-bottom"><div className="strip-message">{busy ? <><Loader2 className="spin" size={14}/>{message}</> : message}</div></div></section>
+    {settingsOpen && <div className="settings-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setSettingsOpen(false); }}>
+      <section className="quality-settings" role="dialog" aria-modal="true" aria-label="Kokybės nustatymai">
+        <div className="settings-heading"><div><b>Spausdinimo kokybės skalė</b><small>Keiskite tikslinę raišką pagal fizinį spaudinio dydį</small></div><button onClick={() => setSettingsOpen(false)}>✕</button></div>
+        <div className="quality-table"><div className="quality-table-head"><span>Formatas</span><span>Ilgoji kraštinė (cm)</span><span>Tikslas (DPI)</span></div>
+          {qualityScale.map((row, index) => <div className="quality-table-row" key={row.id || index}><span>{row.label}</span><input type="number" min="1" max="500" value={row.size} onChange={e => setQualityScale(prev => prev.map((r,i) => i === index ? {...r,size: clamp(Number(e.target.value)||1,1,500)} : r))}/><input type="number" min="30" max="600" value={row.dpi} onChange={e => setQualityScale(prev => prev.map((r,i) => i === index ? {...r,dpi: clamp(Number(e.target.value)||30,30,600)} : r))}/></div>)}
+        </div>
+        <div className="settings-note">Tarp dydžių tikslinė raiška apskaičiuojama tiesine interpoliacija. Vertinimui naudojama mažesnė horizontalios ir vertikalios efektyvios raiškos reikšmė.</div>
+        <div className="settings-actions"><button className="secondary" onClick={() => setQualityScale(DEFAULT_QUALITY_SCALE)}>Atkurti pradines reikšmes</button><button className="primary" onClick={() => setSettingsOpen(false)}>Išsaugoti</button></div>
+      </section>
+    </div>}
     <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.gif,.heic,.heif,.tif,.tiff,image/*" multiple hidden onChange={e => { addFiles(e.target.files); e.target.value = ''; }}/>
   </div>;
 }
