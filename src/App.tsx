@@ -22,6 +22,7 @@ export default function App() {
   const [height,setHeight] = useState(30)
   const [custom,setCustom] = useState(false)
   const [zoom,setZoom] = useState(1)
+  const [cropFrameScale,setCropFrameScale] = useState(1)
   const [pan,setPan] = useState({x:0,y:0})
   const [stageSize,setStageSize] = useState({width:900,height:520})
   const [progress,setProgress] = useState(0)
@@ -36,7 +37,7 @@ export default function App() {
   const [pointer,setPointer] = useState({x:0,y:0,visible:false})
   const inputRef = useRef<HTMLInputElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
-  const dragRef = useRef<{x:number;y:number;panX:number;panY:number}|null>(null)
+  const dragRef = useRef<{x:number;y:number;panX:number;panY:number;mode:'pan'|'resize';frameScale:number}|null>(null)
   const profile:Profile = kind === 'photo' ? 'noritsu' : 'mimaki_poster'
   const ratio = width / height
   const activeFormats = kind === 'photo' ? photoFormats : wideFormats
@@ -47,12 +48,12 @@ export default function App() {
     const update=()=>setStageSize({width:el.clientWidth,height:el.clientHeight})
     update(); const ro=new ResizeObserver(update);ro.observe(el);return ()=>ro.disconnect()
   },[image])
-  useEffect(()=>{ if(!file) return; const next=URL.createObjectURL(file); const img=new Image(); img.onload=()=>{setImage(img);setUrl(next);setZoom(1);setPan({x:0,y:0});setResult(null);setMathConfirmed(false);setCropBlob(null);setCropUrl('')}; img.onerror=()=>setError('Nepavyko atidaryti nuotraukos.'); img.src=next; return ()=>URL.revokeObjectURL(next) },[file])
+  useEffect(()=>{ if(!file) return; const next=URL.createObjectURL(file); const img=new Image(); img.onload=()=>{setImage(img);setUrl(next);setZoom(1);setCropFrameScale(1);setPan({x:0,y:0});setResult(null);setMathConfirmed(false);setCropBlob(null);setCropUrl('')}; img.onerror=()=>setError('Nepavyko atidaryti nuotraukos.'); img.src=next; return ()=>URL.revokeObjectURL(next) },[file])
   useEffect(()=>()=>{if(cropUrl)URL.revokeObjectURL(cropUrl)},[cropUrl])
 
   const rect:Rect|null=useMemo(()=>{
     if(!image||!stageSize.width||!stageSize.height||width<=0||height<=0)return null
-    const fw=Math.min(stageSize.width*.86,stageSize.height*.86*ratio)
+    const fw=Math.min(stageSize.width*.86,stageSize.height*.86*ratio)*cropFrameScale
     const fh=fw/ratio
     const frameLeft=(stageSize.width-fw)/2,frameTop=(stageSize.height-fh)/2
     const base=Math.max(fw/image.naturalWidth,fh/image.naturalHeight)
@@ -63,21 +64,22 @@ export default function App() {
     const y=Math.max(0,Math.min(image.naturalHeight,(frameTop-top)/scale))
     const cw=Math.min(image.naturalWidth-x,fw/scale),ch=Math.min(image.naturalHeight-y,fh/scale)
     return {x,y,width:cw,height:ch,scale,left,top,frameLeft,frameTop,frameWidth:fw,frameHeight:fh}
-  },[image,stageSize,ratio,zoom,pan])
+  },[image,stageSize,ratio,zoom,pan,cropFrameScale])
   const cropPpi=rect?Math.min(rect.width/(width/2.54),rect.height/(height/2.54)):0
 
   function clear(){setFile(null);setImage(null);setUrl('');setResult(null);setError('');setProgress(0);setMathConfirmed(false);setAiEnabled(false);setCropBlob(null);setCropUrl('')}
-  function chooseFormat(w:number,h:number){setWidth(w);setHeight(h);setCustom(false);setResult(null);setMathConfirmed(false);setCropBlob(null);setCropUrl('');setZoom(1);setPan({x:0,y:0})}
+  function chooseFormat(w:number,h:number){setWidth(w);setHeight(h);setCustom(false);setResult(null);setMathConfirmed(false);setCropBlob(null);setCropUrl('');setZoom(1);setCropFrameScale(1);setPan({x:0,y:0})}
   function clampPan(next:{x:number;y:number},nextZoom=zoom){
     if(!image)return next
-    const fw=Math.min(stageSize.width*.86,stageSize.height*.86*ratio),fh=fw/ratio
+    const fw=Math.min(stageSize.width*.86,stageSize.height*.86*ratio)*cropFrameScale,fh=fw/ratio
     const s=Math.max(fw/image.naturalWidth,fh/image.naturalHeight)*nextZoom
     const maxX=Math.max(0,(image.naturalWidth*s-fw)/2),maxY=Math.max(0,(image.naturalHeight*s-fh)/2)
     return {x:Math.max(-maxX,Math.min(maxX,next.x)),y:Math.max(-maxY,Math.min(maxY,next.y))}
   }
   function setZoomLevel(z:number){const nz=Math.max(1,Math.min(10000,z));setZoom(nz);setPan(p=>clampPan(p,nz));setMathConfirmed(false);setCropBlob(null);setCropUrl('')}
-  function onPointerDown(e:React.PointerEvent){if(!image)return;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);dragRef.current={x:e.clientX,y:e.clientY,panX:pan.x,panY:pan.y}}
-  function onPointerMove(e:React.PointerEvent){const bounds=stageRef.current?.getBoundingClientRect();if(bounds)setPointer({x:e.clientX-bounds.left,y:e.clientY-bounds.top,visible:true});if(!dragRef.current)return;const d=dragRef.current;setPan(clampPan({x:d.panX+e.clientX-d.x,y:d.panY+e.clientY-d.y}));setMathConfirmed(false);setCropBlob(null);setCropUrl('')}
+  function onPointerDown(e:React.PointerEvent){if(!image)return;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);dragRef.current={x:e.clientX,y:e.clientY,panX:pan.x,panY:pan.y,mode:'pan',frameScale:cropFrameScale}}
+  function onCornerDown(e:React.PointerEvent){e.preventDefault();e.stopPropagation();if(!image)return;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);dragRef.current={x:e.clientX,y:e.clientY,panX:pan.x,panY:pan.y,mode:'resize',frameScale:cropFrameScale}}
+  function onPointerMove(e:React.PointerEvent){const bounds=stageRef.current?.getBoundingClientRect();if(bounds)setPointer({x:e.clientX-bounds.left,y:e.clientY-bounds.top,visible:true});if(!dragRef.current)return;const d=dragRef.current;const dx=e.clientX-d.x,dy=e.clientY-d.y;if(d.mode==='resize'){const delta=(dx+dy*(ratio>1?ratio:1/ratio))/Math.max(260,stageSize.width+stageSize.height)*2.2;const next=Math.max(.35,Math.min(1,d.frameScale+delta));setCropFrameScale(next);setPan(p=>clampPan(p,zoom));}else{setPan(clampPan({x:d.panX+dx,y:d.panY+dy}));}setMathConfirmed(false);setCropBlob(null);setCropUrl('')}
   function onPointerUp(){dragRef.current=null}
   function swapOrientation(){setWidth(height);setHeight(width);setMathConfirmed(false);setCropBlob(null);setCropUrl('');setResult(null)}
   function getCropCanvas(){
@@ -124,8 +126,8 @@ export default function App() {
         <div className="profile"><b>{kind==='photo'?'Noritsu':'Mimaki'}</b><span>{kind==='photo'?'Premium nuotraukų spauda':'Didelio formato spauda'}</span></div>
       </section>
       <section className="panel cropPanel"><div className="sectionTitle"><Crop/><div><h3>3. Apkirpimas ir kadruotė</h3><p>Tempk nuotrauką po fiksuotu spaudos formato rėmeliu</p></div></div>
-        {image&&rect?<><div className="cropEditor"><div className="cropStagePro" ref={stageRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onPointerLeave={()=>setPointer(p=>({...p,visible:false}))}><img className="cropSource" src={url} alt="Nuotraukos kadruotė" draggable={false} style={imageStyle}/><div className="cropShade"/><div className="cropWindow" style={cropFrameStyle}><div className="cropGrid"><i/><i/><i/><i/><i/><i/><i/><i/><i/></div></div><div className="cropZoomDock"><button className="iconBtn" onClick={()=>setZoomLevel(zoom+.2)} title="Priartinti apkirpimą"><ZoomIn size={18}/></button><button className="iconBtn" onClick={()=>setZoomLevel(zoom-.2)} disabled={zoom<=1} title="Atitolinti apkirpimą"><ZoomOut size={18}/></button><button className={`iconBtn ${magnifier?'activeTool':''}`} onClick={()=>setMagnifier(v=>!v)} title="Didinamasis stiklas"><ScanEye size={18}/></button></div><div className="cropHelp">↔ Vilkite nuotrauką · +/- keičia apkirpimo mastelį</div>{magnifier&&pointer.visible&&image&&rect&&<div className="magnifierLens" style={{left:Math.min(stageSize.width-164,Math.max(0,pointer.x+22)),top:Math.min(stageSize.height-164,Math.max(0,pointer.y+22))}}><img src={url} draggable={false} style={{left:82+(rect.left-pointer.x)*2,top:82+(rect.top-pointer.y)*2,width:image.naturalWidth*rect.scale*2,height:image.naturalHeight*rect.scale*2}}/></div>}</div></div>
-          <div className="cropTools"><label className="lensToggle"><input type="checkbox" checked={magnifier} onChange={e=>setMagnifier(e.target.checked)}/> Didinamasis stiklas prie kursoriaus</label><button className="iconBtn resetCrop" onClick={()=>{setZoom(1);setPan({x:0,y:0});setMathConfirmed(false);setCropBlob(null);setCropUrl('')}}><RotateCcw size={15}/> Atstatyti apkirpimą</button></div>
+        {image&&rect?<><div className="cropEditor"><div className="cropStagePro" ref={stageRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} onPointerLeave={()=>setPointer(p=>({...p,visible:false}))}><img className="cropSource" src={url} alt="Nuotraukos kadruotė" draggable={false} style={imageStyle}/><div className="cropShade"/><div className="cropWindow" style={cropFrameStyle}><div className="cropGrid"><i/><i/><i/><i/><i/><i/><i/><i/><i/></div><button className="cropHandle tl" onPointerDown={onCornerDown} aria-label="Keisti apkirpimo dydį"/><button className="cropHandle tr" onPointerDown={onCornerDown} aria-label="Keisti apkirpimo dydį"/><button className="cropHandle bl" onPointerDown={onCornerDown} aria-label="Keisti apkirpimo dydį"/><button className="cropHandle br" onPointerDown={onCornerDown} aria-label="Keisti apkirpimo dydį"/></div><div className="cropZoomDock"><button className={`iconBtn ${magnifier?'activeTool':''}`} onClick={()=>setMagnifier(v=>!v)} title="Didinamasis stiklas"><ScanEye size={18}/></button></div><div className="cropHelp">Vilk nuotrauką · tempk rėmelio kampus, kad keistum apkirpimo mastelį</div>{magnifier&&pointer.visible&&image&&rect&&<div className="magnifierLens" style={{left:Math.min(stageSize.width-164,Math.max(0,pointer.x+22)),top:Math.min(stageSize.height-164,Math.max(0,pointer.y+22))}}><img src={url} draggable={false} style={{left:82+(rect.left-pointer.x)*2,top:82+(rect.top-pointer.y)*2,width:image.naturalWidth*rect.scale*2,height:image.naturalHeight*rect.scale*2}}/></div>}</div></div>
+          <div className="cropTools"><label className="lensToggle"><input type="checkbox" checked={magnifier} onChange={e=>setMagnifier(e.target.checked)}/> Didinamasis stiklas prie kursoriaus</label><button className="iconBtn resetCrop" onClick={()=>{setZoom(1);setCropFrameScale(1);setPan({x:0,y:0});setMathConfirmed(false);setCropBlob(null);setCropUrl('')}}><RotateCcw size={15}/> Atstatyti apkirpimą</button></div>
           <p className="hint">Rėmelio proporcijos atitinka {fmt(width,height)}. Už rėmelio esanti sritis nebus spausdinama. Priartink vaizdą ir vilk jį, kad pasirinktum tikslią iškarpą.</p>
         </>:<p className="hint">Pirmiausia įkelk nuotrauką, tada galėsi ją apkirpti.</p>}
       </section>

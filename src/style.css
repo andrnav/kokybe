@@ -22,3 +22,14 @@
 .lensToggle{display:flex;align-items:center;gap:9px;color:#b9cbd4;font-size:12px}.orientationBtn{width:100%;padding:9px 11px;border:1px solid #344a58;border-radius:9px;background:#15232e;color:#c8d9df;font-size:11px;cursor:pointer;margin:0 0 12px}.orientationBtn:hover{border-color:#71d8b9}
 @media(max-width:1000px){.workspaceLayout{grid-template-columns:1fr;grid-template-areas:"upload" "format" "crop" "math" "ai"}.workspaceLayout>.cropPanel{position:static}.cropStagePro{height:65vh;min-height:380px}}
 @media(max-width:650px){.workspaceLayout{grid-template-columns:minmax(0,1fr)}.cropStagePro{height:55vh;min-height:330px}.cropZoomDock{right:7px}.magnifierLens{width:140px;height:140px}}
+
+/* 4.3: Photoshop tipo apkirpimo kampai */
+.cropWindow{pointer-events:none!important}
+.cropHandle{position:absolute;width:22px;height:22px;border:2px solid #fff;background:#183c35;border-radius:5px;z-index:12;pointer-events:auto;touch-action:none;box-shadow:0 1px 8px #000a;cursor:nwse-resize}
+.cropHandle.tl{left:-9px;top:-9px}
+.cropHandle.tr{right:-9px;top:-9px;cursor:nesw-resize}
+.cropHandle.bl{left:-9px;bottom:-9px;cursor:nesw-resize}
+.cropHandle.br{right:-9px;bottom:-9px}
+.cropWindow{overflow:visible}
+.cropZoomDock{display:none!important}
+.cropHelp{max-width:calc(100% - 28px)}
