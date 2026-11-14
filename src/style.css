@@ -329,3 +329,8 @@
 
 .batchFitPreview{height:min(66vh,650px);min-height:360px;background:#fff;display:flex;align-items:center;justify-content:center;padding:18px}
 .batchFitPreview img{width:100%;height:100%;object-fit:contain}
+/* Batch UI refinements: compact per-photo controls */
+.printboxCopies b{display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#303b40;background:#fff}
+.batchCropperTitle>button{flex-shrink:0}
+.printboxCardFoot{align-items:center;gap:6px;flex-wrap:wrap}
+.printboxCardFoot small:first-child{margin-right:auto}
