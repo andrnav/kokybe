@@ -1,48 +1,30 @@
-# Photo Quality Checker
+# Photo Quality AI – beta 1.0
 
-Pirmoji lokali nuotraukų tinkamumo spaudai analizės versija.
+Nauja lokali nuotraukų kokybės tikrinimo aplikacija.
 
-## Paleidimas macOS
-
-1. Įdiekite Node.js LTS (jei dar nėra).
-2. Išskleiskite ZIP archyvą.
-3. Terminale pereikite į projekto aplanką.
-4. Vykdykite:
-
+## Paleidimas
 ```bash
 npm install
 npm run dev
 ```
 
-5. Atidarykite terminale parodytą vietinį adresą, dažniausiai `http://localhost:5173`.
-
-## Gamybinė versija
-
+## Build
 ```bash
 npm run build
 ```
 
-Sukurti failai bus `dist/` aplanke. `vite.config.ts` jau nustatytas santykiniams keliams, todėl projektą galima publikuoti GitHub Pages.
+## GitHub Pages
+Projektas sukonfigūruotas publikuoti iš `andrnav/kokybe` šakninio Vite build'o (`base: '/kokybe/'`). Reikės GitHub Actions workflow arba Pages deploy konfigūracijos.
 
 ## Privatumas
+Nuotraukos nėra siunčiamos į aplikacijos serverį. AI modeliai atsisiunčiami iš Hugging Face į naršyklę ir gali būti saugomi Cache API.
 
-Nuotraukos failas apdorojamas naršyklėje per `URL.createObjectURL`, `HTMLImageElement` ir Canvas. Nėra API ar serverio įkėlimo. Paspaudus „Pašalinti failą“ panaikinama lokali URL nuoroda ir išvaloma aplikacijos būsena. Naršyklė pati valdo fizinį atminties išvalymą.
+## Svarbūs beta apribojimai
+- Šiame leidime AI kokybės modelių ONNX įvesties / išvesties kontraktas dar turi būti patikrintas su realiu modelio vykdymu konkrečiose naršyklėse. Jei išvesties mastelis neatpažįstamas, programa sąmoningai nerodo balo.
+- Veidų ir akių lokali analizė dar neįjungta. UI ir architektūra paruošta kitam etapui; bendro NR-IQA balo negalima laikyti veido ryškumo detektoriumi.
+- TIFF / BigTIFF analizė dar nepalaikoma.
+- PPI profiliai yra laboratoriniai orientaciniai slenksčiai, juos reikia kalibruoti su realiais spaudiniais.
+- ONNX modelių failų dydžiai ir prieinamumas priklauso nuo modelių saugyklos. Modeliai neįtraukti į ZIP, kad GitHub saugykla nebūtų užpildyta dideliais binariniais failais.
 
-## Dabartinės analizės ribos
-
-- DPI skaičiuojamas iš realaus pikselių skaičiaus ir pasirinkto fizinio dydžio. Įrašytas DPI metaduomuo rodomas tik informaciniais tikslais.
-- Numatyta analizė visam vaizdui be apkirpimo; trumpesnė kraštinė lemia konservatyvų efektyvų DPI.
-- Ryškumas vertinamas Laplaso dispersijos metodu. Tai tik orientacinis indikatorius, o ne universalus AI kokybės balas.
-- Triukšmo ir JPEG artefaktų patikimam atskiram įvertinimui reikės papildomų algoritmų ir testavimo su realiomis laboratorijos nuotraukomis.
-- Maksimalus dydis pateikiamas pagal trumpesnę kraštinę ir 150 DPI, todėl tai konservatyvus orientyras.
-
-## Kitas etapas
-
-Patikrinti su realiais failais iš laboratorijos, suderinti DPI ribas pagal spaudos technologiją, drobės tekstūrą, žiūrėjimo atstumą ir gamybos praktiką.
-
-## TIFF ir dideli failai
-
-- Įkeliamo failo riba: 500 MB.
-- Pasirinktas tikslas: FULL analizė, t. y. visų originalo pikselių analizė blokais, ne vien peržiūros kopijos.
-- Techninis planas ir suderinamumo ribos aprašyti `ARCHITEKTURA.md`.
-- Svarbu: šiame etape 500 MB validacija jau įdėta, tačiau pilnas TIFF dekoderio Web Worker dar neįgyvendintas. Todėl negalima laikyti, kad visi TIFF failai jau palaikomi. Dabartinis naršyklės vaizdo dekoderis priklauso nuo konkrečios naršyklės galimybių.
+## Modelių šaltinis
+86Cao/IQA-ONNX-Models (Apache-2.0 pagal modelio kortelę): MUSIQ, DBCNN, HyperIQA ir kiti.
