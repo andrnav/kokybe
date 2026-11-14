@@ -11,10 +11,19 @@ import './style.css';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 const FORMATS = [
-  { id: '10x15', label: '10 × 15 cm', ratioLabel: '2:3', cm: [10, 15] },
-  { id: '15x30', label: '15 × 30 cm', ratioLabel: '1:2', cm: [15, 30] },
-  { id: '15x15', label: '15 × 15 cm', ratioLabel: '1:1', cm: [15, 15] },
+  { id: '9x13', label: '9 × 13 cm', ratioLabel: '8,9 × 12,7 cm', cm: [8.9, 12.7] },
+  { id: '10x15', label: '10 × 15 cm', ratioLabel: '10,2 × 15,2 cm', cm: [10.2, 15.2] },
+  { id: '13x18', label: '13 × 18 cm', ratioLabel: '12,7 × 17,8 cm', cm: [12.7, 17.8] },
+  { id: '15x15', label: '15 × 15 cm', ratioLabel: '15,2 × 15,2 cm', cm: [15.2, 15.2] },
+  { id: '13x19', label: '13 × 19 cm', ratioLabel: '12,7 × 19 cm', cm: [12.7, 19] },
+  { id: '15x21', label: '15 × 21 cm', ratioLabel: '15,2 × 21 cm', cm: [15.2, 21] },
+  { id: '15x23', label: '15 × 23 cm', ratioLabel: '15,2 × 22,8 cm', cm: [15.2, 22.8] },
+  { id: '20x30', label: '20 × 30 cm', ratioLabel: '20,3 × 30,5 cm', cm: [20.3, 30.5] },
   { id: 'a4', label: 'A4', ratioLabel: '21 × 29,7 cm', cm: [21, 29.7] },
+  { id: '30x30', label: '30 × 30 cm', ratioLabel: '30,5 × 30,5 cm', cm: [30.5, 30.5] },
+  { id: '30x40', label: '30 × 40 cm', ratioLabel: '30,5 × 40 cm', cm: [30.5, 40] },
+  { id: 'a3', label: 'A3', ratioLabel: '29,7 × 42 cm', cm: [29.7, 42] },
+  { id: '30x45', label: '30 × 45 cm', ratioLabel: '30,5 × 45 cm', cm: [30.5, 45] },
 ];
 const DEFAULT_QUALITY_SCALE = [
   { id: '10x15', label: '10 × 15 cm', size: 15, dpi: 200 },
@@ -308,8 +317,14 @@ function App() {
   const changeCustom = (index, raw) => {
     const value = clamp(Number(raw) || 0.1, 0.1, 300);
     const next = [...customCm]; next[index] = round1(value);
-    setCustomCm(next); setFormat('custom');
-    setPhotos(prev => prev.map(p => p.mode === 'free' ? p : ({ ...p, format: 'custom', customCm: next, status: p.status === 'done' ? 'editing' : p.status })));
+    const matched = FORMATS.find(f =>
+      (Math.abs(f.cm[0] - next[0]) < 0.001 && Math.abs(f.cm[1] - next[1]) < 0.001) ||
+      (Math.abs(f.cm[1] - next[0]) < 0.001 && Math.abs(f.cm[0] - next[1]) < 0.001)
+    );
+    const nextFormat = matched?.id || 'custom';
+    setCustomCm(matched ? [...matched.cm] : next); setFormat(nextFormat);
+    const dimensions = matched ? [...matched.cm] : next;
+    setPhotos(prev => prev.map(p => p.mode === 'free' ? p : ({ ...p, format: nextFormat, customCm: dimensions, status: p.status === 'done' ? 'editing' : p.status })));
   };
 
   const addFiles = async files => {
@@ -376,7 +391,9 @@ function App() {
     try {
       const zip = new JSZip();
       for (let i = 0; i < photos.length; i++) { const result = await exportOne(photos[i]); zip.file(result.name, result.blob); setMessage(`Apdorojama ${i + 1} / ${photos.length}`); }
-      downloadBlob(await zip.generateAsync({ type: 'blob' }), 'foto-inspektorius.zip');
+      const now = new Date();
+      const stamp = `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+      downloadBlob(await zip.generateAsync({ type: 'blob' }), `foto-inspektorius ${stamp}.zip`);
       setPhotos(prev => prev.map(p => ({ ...p, status: 'done' })));
       setMessage('ZIP archyvas paruoštas.');
     } catch (e) { console.error(e); setMessage('Eksportuojant įvyko klaida.'); }
