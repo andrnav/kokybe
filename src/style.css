@@ -16,3 +16,22 @@
 .thumb-image.status-new{border-color:#596475}
 .thumb-image.status-editing{border-color:#e9ad29}
 .thumb-image.status-done{border-color:#26bd76}
+
+/* Print-format preview: the white sheet itself is the exact selected aspect ratio. */
+.print-sheet{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);overflow:hidden;flex:none;isolation:isolate;background:#fff;box-shadow:0 12px 42px #0008}
+.print-sheet.mode-crop,.print-sheet.mode-real{background:#111720;box-shadow:0 0 0 9999px #080c13a8,0 12px 42px #0008;cursor:grab}
+.print-sheet.mode-crop:active,.print-sheet.mode-real:active{cursor:grabbing}
+.print-sheet.mode-fit{background:#fff;box-shadow:0 0 0 9999px #080c13a8,0 12px 42px #0008;cursor:default}
+.print-sheet .stage-photo{position:absolute;display:block;max-width:none;max-height:none;object-fit:fill;pointer-events:none;user-select:none;transform-origin:center center;will-change:transform}
+.print-sheet.mode-fit .stage-photo{object-fit:contain}
+.custom-format{margin-top:17px;display:flex;flex-direction:column;gap:8px}
+.custom-format-title{font-size:11px;font-weight:600;color:#aeb9c8}
+.custom-format-fields{display:grid;grid-template-columns:minmax(0,1fr) 16px minmax(0,1fr);align-items:center;gap:7px}
+.custom-format-fields input{width:100%;min-width:0;background:#111720;border:1px solid #394555;border-radius:7px;padding:10px 8px;color:#edf3fb;font:600 14px Inter,sans-serif;text-align:center;outline:none}
+.custom-format-fields input:focus{border-color:#318cff;box-shadow:0 0 0 2px #318cff24}
+.custom-format-fields span{text-align:center;color:#aab5c4;font-weight:700}
+.custom-format-option{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;background:#1c2430;border:1px solid #303b49;border-radius:8px;padding:10px 11px;color:#dce5f1}
+.custom-format-option b{font-size:11px}.custom-format-option small{font-size:10px;color:#8e9caf}
+.custom-format-option.selected{border-color:#318cff;background:#1c3551;box-shadow:inset 0 0 0 1px #318cff}
+.left-panel{overflow-y:auto}
+.thumb-image img{object-fit:contain!important;background:#111720}
