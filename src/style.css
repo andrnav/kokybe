@@ -159,3 +159,59 @@
 @media(max-width:560px){.quality-results{grid-template-columns:1fr}.quality-preview-heading{align-items:flex-start;flex-direction:column}.quality-type-options button{font-size:10px}.quality-workspace{padding:8px}}
 .iqa-model-list{display:flex;flex-direction:column;gap:6px}.iqa-model-list label{display:flex;align-items:center;gap:9px;padding:8px 9px;border:1px solid #354151;border-radius:7px;background:#1d2632;color:#dce6f3;cursor:pointer}.iqa-model-list input{accent-color:#398cff}.iqa-model-list span{display:flex;align-items:center;justify-content:space-between;gap:10px;flex:1}.iqa-model-list b{font-size:11px}.iqa-model-list small,.iqa-note{font-size:9px;color:#91a1b5}.iqa-pan{display:flex;flex-direction:column;gap:3px;color:#aab8c9;font-size:10px}.quality-crop-wrap{width:min(100%,1000px);overflow:hidden;background:#0c1118;position:relative;flex:none}.quality-crop-wrap>img{flex:none;object-fit:cover;box-shadow:none;max-width:none;max-height:none}.quality-crop-wrap .quality-grid-overlay{inset:0}
 .quality-result-card.quality-result-error{border-color:#75444a;background:#2a2026}.quality-result-card.quality-result-error b{color:#ff9b9b}
+
+
+/* Aiškus 1–10 spaudos kokybės įvertinimas */
+.print-rating-panel {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.72fr) minmax(0, 2fr);
+  gap: 18px;
+  padding: 20px;
+  margin: 18px 0;
+  border: 1px solid var(--border, #d8dce3);
+  border-radius: 16px;
+  background: var(--panel, #fff);
+}
+.print-rating-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 5px;
+  padding-right: 18px;
+  border-right: 1px solid var(--border, #d8dce3);
+}
+.print-rating-main > small {
+  color: var(--muted, #687386);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .09em;
+}
+.print-rating-main > div { display: flex; align-items: baseline; gap: 5px; }
+.print-rating-main strong { font-size: clamp(42px, 6vw, 64px); line-height: 1; letter-spacing: -.06em; }
+.print-rating-main > div span { color: var(--muted, #687386); font-size: 17px; }
+.print-rating-main > b { font-size: 16px; }
+.print-rating-details { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-content: center; }
+.print-rating-details > div { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.print-rating-details span { color: var(--muted, #687386); font-size: 12px; }
+.print-rating-details b { font-size: 20px; }
+.print-rating-details small { color: var(--muted, #687386); font-size: 11px; line-height: 1.4; }
+.print-rating-explanation {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-top: 13px;
+  border-top: 1px solid var(--border, #d8dce3);
+  color: var(--text, #303846);
+  font-size: 13px;
+  line-height: 1.5;
+}
+@media (max-width: 760px) {
+  .print-rating-panel { grid-template-columns: 1fr; gap: 14px; }
+  .print-rating-main { border-right: 0; border-bottom: 1px solid var(--border, #d8dce3); padding: 0 0 14px; }
+  .print-rating-details { grid-template-columns: 1fr; }
+}
+
+/* v2.0.3: direct mouse/touch crop positioning in the quality preview. */
+.quality-crop-wrap{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.quality-crop-wrap:active{cursor:grabbing}
+.quality-crop-wrap>img{pointer-events:none}
