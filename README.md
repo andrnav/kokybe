@@ -86,3 +86,18 @@ Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe
 - Naudojama `heic-to` 1.6.7, paremta naujesniu libheif 1.23.7.
 - HEIC/HEIF konvertuojamas į PNG naršyklėje. PDF apdorojimo kodas nepakeistas.
 - Jei HEIC nepavyksta perskaityti, klaidos pranešime atskirai pateikiama dekoderio ir naršyklės klaida.
+
+## v2.0.2 – eksperimentinis naršyklės AI kokybės vertinimas
+
+- Įjungtas atskiras „Nuotraukos kokybė“ skirtukas. Jis priima vieną nuotrauką, leidžia pasirinkti spaudos tipą ir matmenis.
+- Pridėtas DBCNN no-reference IQA modelis per `onnxruntime-web`. Modelis vykdomas naršyklėje, naudojant WebAssembly CPU vykdymo aplinką.
+- Modelio failas ir svoriai pirmo naudojimo metu atsisiunčiami iš Hugging Face ir išsaugomi naršyklės Cache API talpykloje.
+- Papildomai rodoma 3×3 vietinė kontrasto / detalumo heuristika. Pažymėjimai nėra patvirtintas fokusavimo ar spaudos tinkamumo nustatymas.
+- Nuotraukos analizės metu nesiunčiamos į mūsų serverį. Modelio atsisiuntimui pirmą kartą reikalingas internetas.
+
+### Eksperimentinio AI apribojimai
+
+- Ši versija vertina visą įkeltą nuotrauką. Kadravimo sąsaja ir analizė tiksliai apkirptam plotui bus integruojama kitame etape.
+- DBCNN yra bendras suvokiamos kokybės vertintojas, o ne specializuotas spaudos fokusavimo diagnostikos modelis.
+- Balas nėra DPI ar spaudos kokybės procentas. Jį būtina kalibruoti su realiais spaudos pavyzdžiais.
+- Jei Hugging Face modelio failai nepasiekiami arba naršyklė neleidžia jų atsisiųsti, AI analizė parodys klaidą; įprastas kadravimo skirsnis nuo to nepriklauso.

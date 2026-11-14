@@ -5,7 +5,8 @@ import { heicTo } from 'heic-to';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import * as UTIF from 'utif';
-import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2 } from 'lucide-react';
+import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2, Sparkles, BrainCircuit, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import * as ort from 'onnxruntime-web';
 import './style.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -233,6 +234,104 @@ function renderPhoto(photo, canvas, { thumbnail = false } = {}) {
   ctx.drawImage(photo.image, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
 }
 
+const IQA_MODEL_URL = 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/dbcnn_model.onnx';
+const IQA_DATA_URL = 'https://huggingface.co/86Cao/IQA-ONNX-Models/resolve/main/dbcnn_model.onnx.data';
+const IQA_CACHE = 'foto-inspektorius-iqa-dbcnn-v1';
+let dbcnnSessionPromise = null;
+
+async function getCachedModelFile(url, key, onProgress) {
+  const cache = 'caches' in window ? await caches.open(IQA_CACHE) : null;
+  const cacheKey = new Request(`${location.origin}/__iqa_cache__/${key}`);
+  const saved = cache ? await cache.match(cacheKey) : null;
+  if (saved) return saved.blob();
+  const response = await fetch(url, { mode: 'cors' });
+  if (!response.ok) throw new Error(`Nepavyko atsisiųsti AI modelio (${response.status}).`);
+  const total = Number(response.headers.get('content-length')) || 0;
+  if (!response.body) {
+    const blob = await response.blob();
+    if (cache) await cache.put(cacheKey, new Response(blob));
+    return blob;
+  }
+  const reader = response.body.getReader();
+  const chunks = []; let received = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value); received += value.length;
+    onProgress?.(total ? Math.min(99, Math.round(received / total * 100)) : null);
+  }
+  const blob = new Blob(chunks, { type: 'application/octet-stream' });
+  if (cache) await cache.put(cacheKey, new Response(blob));
+  onProgress?.(100);
+  return blob;
+}
+
+async function loadDbcnn(onProgress) {
+  if (!dbcnnSessionPromise) {
+    dbcnnSessionPromise = (async () => {
+      ort.env.wasm.numThreads = Math.min(4, Math.max(1, navigator.hardwareConcurrency || 2));
+      const modelBlob = await getCachedModelFile(IQA_MODEL_URL, 'dbcnn_model.onnx', v => onProgress?.('model', v));
+      const dataBlob = await getCachedModelFile(IQA_DATA_URL, 'dbcnn_model.onnx.data', v => onProgress?.('weights', v));
+      const modelBuffer = await modelBlob.arrayBuffer();
+      return ort.InferenceSession.create(modelBuffer, {
+        executionProviders: ['wasm'],
+        graphOptimizationLevel: 'all',
+        externalData: [{ path: 'dbcnn_model.onnx.data', data: dataBlob }],
+      });
+    })().catch(error => { dbcnnSessionPromise = null; throw error; });
+  }
+  return dbcnnSessionPromise;
+}
+
+function imageToDbcnnTensor(image) {
+  const canvas = document.createElement('canvas'); canvas.width = 224; canvas.height = 224;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(image, 0, 0, 224, 224);
+  const pixels = ctx.getImageData(0, 0, 224, 224).data;
+  const mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225];
+  const data = new Float32Array(3 * 224 * 224);
+  for (let i = 0; i < 224 * 224; i++) {
+    data[i] = ((pixels[i * 4] / 255) - mean[0]) / std[0];
+    data[224 * 224 + i] = ((pixels[i * 4 + 1] / 255) - mean[1]) / std[1];
+    data[2 * 224 * 224 + i] = ((pixels[i * 4 + 2] / 255) - mean[2]) / std[2];
+  }
+  return new ort.Tensor('float32', data, [1, 3, 224, 224]);
+}
+
+function calculateSharpnessGrid(image) {
+  const cols = 3, rows = 3, tileW = Math.max(1, Math.floor(image.naturalWidth / cols)), tileH = Math.max(1, Math.floor(image.naturalHeight / rows));
+  const canvas = document.createElement('canvas'); canvas.width = 384; canvas.height = 384;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const scores = [];
+  for (let gy = 0; gy < rows; gy++) for (let gx = 0; gx < cols; gx++) {
+    const x0 = Math.floor(gx * width / cols), x1 = Math.floor((gx + 1) * width / cols);
+    const y0 = Math.floor(gy * height / rows), y1 = Math.floor((gy + 1) * height / rows);
+    let sum = 0, sum2 = 0, count = 0, edges = 0;
+    for (let y = y0 + 1; y < y1 - 1; y += 2) for (let x = x0 + 1; x < x1 - 1; x += 2) {
+      const at = (y * width + x) * 4;
+      const lum = 0.2126 * data[at] + 0.7152 * data[at + 1] + 0.0722 * data[at + 2];
+      const left = (y * width + x - 1) * 4, right = (y * width + x + 1) * 4;
+      const up = ((y - 1) * width + x) * 4, down = ((y + 1) * width + x) * 4;
+      const l = 0.2126 * data[left] + 0.7152 * data[left + 1] + 0.0722 * data[left + 2];
+      const r = 0.2126 * data[right] + 0.7152 * data[right + 1] + 0.0722 * data[right + 2];
+      const u = 0.2126 * data[up] + 0.7152 * data[up + 1] + 0.0722 * data[up + 2];
+      const d = 0.2126 * data[down] + 0.7152 * data[down + 1] + 0.0722 * data[down + 2];
+      const edge = Math.hypot(r - l, d - u);
+      sum += edge; sum2 += edge * edge; count++; if (edge > 22) edges++;
+    }
+    const mean = count ? sum / count : 0;
+    const variance = count ? Math.max(0, sum2 / count - mean * mean) : 0;
+    scores.push({ x: gx, y: gy, score: Math.sqrt(variance), edgeShare: count ? edges / count : 0 });
+  }
+  const sorted = scores.map(s => s.score).sort((a,b) => a-b);
+  const median = sorted[Math.floor(sorted.length / 2)] || 0;
+  // A tile is flagged only when it is clearly weaker than the image's own median;
+  // this reduces false alarms on naturally smooth skies and plain backgrounds.
+  return scores.map(s => ({ ...s, weak: median > 0 && s.score < median * 0.42 && s.edgeShare < 0.12 }));
+}
+
 function App() {
   const [photos, setPhotos] = useState([]);
   const [activeId, setActiveId] = useState(null);
@@ -247,6 +346,14 @@ function App() {
   const [message, setMessage] = useState('');
   const [qualityScale, setQualityScale] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('foto-inspektorius-quality-scale')); return Array.isArray(saved) && saved.length ? saved : DEFAULT_QUALITY_SCALE; } catch { return DEFAULT_QUALITY_SCALE; } });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('crop');
+  const [qualityImage, setQualityImage] = useState(null);
+  const [qualityDimensions, setQualityDimensions] = useState([10.2, 15.2]);
+  const [qualityPrintType, setQualityPrintType] = useState('photo');
+  const [qualityStatus, setQualityStatus] = useState('idle');
+  const [qualityProgress, setQualityProgress] = useState('');
+  const [qualityResult, setQualityResult] = useState(null);
+  const qualityFileRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
   const [resizeStart, setResizeStart] = useState(null);
@@ -535,10 +642,67 @@ function App() {
     </div>;
   };
 
+  const loadQualityImage = async file => {
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp|bmp|tiff?)$/i.test(file.type) && !/\.(jpe?g|png|webp|bmp|tif|tiff)$/i.test(file.name)) {
+      setMessage('Nuotraukų kokybės bandymui pasirink JPG, PNG, WEBP, BMP arba TIFF failą.'); return;
+    }
+    try {
+      const decoded = await decodeFile(file);
+      setQualityImage({ ...decoded, name: file.name });
+      setQualityResult(null); setQualityStatus('idle'); setQualityProgress('');
+    } catch (error) { setMessage(`Nepavyko įkelti nuotraukos: ${error.message}`); }
+  };
+
+  const runQualityAnalysis = async () => {
+    if (!qualityImage || qualityStatus === 'running') return;
+    setQualityStatus('loading'); setQualityProgress('Paruošiamas AI modelis…');
+    try {
+      const session = await loadDbcnn((part, value) => setQualityProgress(`${part === 'model' ? 'AI modelis' : 'Modelio svoriai'}: ${value == null ? 'atsisiunčiama' : `${value}%`}`));
+      setQualityStatus('running'); setQualityProgress('Vykdoma AI analizė…');
+      const inputName = session.inputNames[0];
+      const outputName = session.outputNames[0];
+      const output = await session.run({ [inputName]: imageToDbcnnTensor(qualityImage.image) });
+      const score = Number(output[outputName].data[0]);
+      const grid = calculateSharpnessGrid(qualityImage.image);
+      const [wCm, hCm] = qualityDimensions;
+      const dpiX = qualityImage.width / (wCm / 2.54), dpiY = qualityImage.height / (hCm / 2.54);
+      const weakTiles = grid.filter(tile => tile.weak).length;
+      setQualityResult({ score, grid, dpiX, dpiY, width: qualityImage.width, height: qualityImage.height, weakTiles, analyzedAt: new Date().toISOString() });
+      setQualityStatus('done'); setQualityProgress('Analizė baigta. Nuotrauka apdorota šiame įrenginyje.');
+    } catch (error) {
+      console.error('IQA analysis error:', error);
+      setQualityStatus('error'); setQualityProgress(`AI analizė nepavyko: ${error.message || 'nežinoma klaida'}`);
+    }
+  };
+
+  const qualityTabView = <main className="quality-workspace">
+    <section className="quality-control-panel">
+      <div className="panel-title">1. Nuotrauka</div>
+      <button className="quality-upload" onClick={() => qualityFileRef.current?.click()}><ImagePlus size={19}/><span>{qualityImage ? 'Pakeisti nuotrauką' : 'Įkelti vieną nuotrauką'}</span></button>
+      {qualityImage && <div className="quality-file-name">{qualityImage.name}<small>{qualityImage.width.toLocaleString('lt-LT')} × {qualityImage.height.toLocaleString('lt-LT')} px</small></div>}
+      <div className="section-divider"/><div className="panel-title">2. Spaudos tipas</div>
+      <div className="quality-type-options"><button className={qualityPrintType === 'photo' ? 'selected' : ''} onClick={() => setQualityPrintType('photo')}>Foto spauda</button><button className={qualityPrintType === 'wide' ? 'selected' : ''} onClick={() => setQualityPrintType('wide')}>Platiaformatė spauda</button></div>
+      <div className="panel-title quality-subtitle">3. Spaudos matmenys (cm)</div>
+      {qualityPrintType === 'photo' && <div className="select-wrap"><select value={FORMATS.find(f => f.cm[0] === qualityDimensions[0] && f.cm[1] === qualityDimensions[1])?.id || 'custom'} onChange={e => { const f = FORMATS.find(x => x.id === e.target.value); if (f) setQualityDimensions([...f.cm]); }}>{FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}<option value="custom">Pagal skaičius</option></select></div>}
+      <div className="custom-format-fields quality-dimensions"><input type="number" min="1" max="300" step="0.1" value={qualityDimensions[0]} onChange={e => setQualityDimensions([Math.max(1, Number(e.target.value) || 1), qualityDimensions[1]])}/><span>×</span><input type="number" min="1" max="300" step="0.1" value={qualityDimensions[1]} onChange={e => setQualityDimensions([qualityDimensions[0], Math.max(1, Number(e.target.value) || 1)])}/></div>
+      <div className="section-divider"/><div className="model-info"><BrainCircuit size={18}/><div><b>DBCNN AI modelis</b><small>~59 MB · vykdomas naršyklėje · pirmą kartą atsisiunčiamas vieną kartą</small></div></div>
+      <button className="primary quality-run" onClick={runQualityAnalysis} disabled={!qualityImage || ['loading','running'].includes(qualityStatus)}>{['loading','running'].includes(qualityStatus) ? <Loader2 className="spin" size={16}/> : <Sparkles size={16}/>} {qualityStatus === 'done' ? 'Analizuoti dar kartą' : 'Analizuoti nuotrauką'}</button>
+      <div className={`quality-progress ${qualityStatus}`}>{qualityProgress || 'Nuotrauka nebus siunčiama į serverį. Analizė vyksta šiame įrenginyje.'}</div>
+    </section>
+    <section className="quality-preview-panel">
+      <div className="quality-preview-heading"><div><b>Nuotraukos peržiūra</b><span>Visa nuotrauka · preliminarus pirmasis AI bandymas</span></div>{qualityResult && <span className="quality-score">DBCNN: {qualityResult.score.toFixed(1)} / 100</span>}</div>
+      <div className="quality-preview-stage">{qualityImage ? <div className="quality-image-wrap"><img src={qualityImage.url} alt="Įkelta analizuojama nuotrauka"/>{qualityResult && <div className="quality-grid-overlay">{qualityResult.grid.map(tile => <div key={`${tile.x}-${tile.y}`} className={tile.weak ? 'weak' : ''} style={{ left: `${tile.x * 33.333}%`, top: `${tile.y * 33.333}%`, width: '33.333%', height: '33.333%' }}>{tile.weak && <span>Galimas ryškumo trūkumas</span>}</div>)}</div>}</div> : <div className="empty-stage"><Images size={48}/><b>Įkelkite nuotrauką analizei</b><span>Šiame bandyme vertinsime vieną nuotrauką vienu metu.</span><button className="primary" onClick={() => qualityFileRef.current?.click()}><ImagePlus size={17}/> Įkelti nuotrauką</button></div>}</div>
+      {qualityResult && <div className="quality-results"><div className="quality-result-card"><small>AI kokybės balas</small><b>{qualityResult.score.toFixed(1)} / 100</b><span>DBCNN bendras kokybės įvertinimas, ne spaudos garantija</span></div><div className="quality-result-card"><small>Efektyvi raiška</small><b>{Math.round(Math.min(qualityResult.dpiX, qualityResult.dpiY))} DPI</b><span>{qualityResult.width} × {qualityResult.height} px pagal {qualityDimensions.join(' × ')} cm</span></div><div className="quality-result-card"><small>Galimos probleminės sritys</small><b>{qualityResult.weakTiles} / 9</b><span>Kontrasto / detalumo heuristika, ne galutinis fokusavimo nustatymas</span></div></div>}
+      <div className="quality-disclaimer"><AlertTriangle size={15}/> Pirmasis prototipas. DBCNN vertina bendrą suvokiamą kokybę, o pažymėtos sritys nustatomos papildomu vaizdo kontrasto algoritmu. Tai dar nėra patvirtintas spaudos tinkamumo verdiktas.</div>
+    </section>
+    <input ref={qualityFileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,image/*" hidden onChange={e => { loadQualityImage(e.target.files?.[0]); e.target.value = ''; }}/>
+  </main>;
+
   const currentFormatId = active?.format || format;
   return <div className="app-shell">
-    <header className="topbar"><div className="brand"><div className="brand-icon"><Camera size={21}/></div><span>Foto inspektorius</span></div><nav className="tabs"><button className="tab active"><Crop size={17}/> Kadravimas</button><button className="tab disabled" title="Šis skirsnis bus kuriamas vėliau"><Images size={17}/> Nuotraukos kokybė</button></nav><div className="top-actions"><span className="batch-count">{photos.length ? `Nuotraukų partija · ${photos.length} fail.` : 'Nauja nuotraukų partija'}</span><button className="icon-button" title="Kokybės nustatymai" onClick={() => setSettingsOpen(true)}><Settings2 size={19}/></button><button className="download-button" onClick={exportAll} disabled={!photos.length || busy}><Download size={17}/> Atsisiųsti viską <span className="zip-pill">ZIP</span></button></div></header>
-    <main className="workspace">
+    <header className="topbar"><div className="brand"><div className="brand-icon"><Camera size={21}/></div><span>Foto inspektorius</span></div><nav className="tabs"><button className={`tab ${activeTab === 'crop' ? 'active' : ''}`} onClick={() => setActiveTab('crop')}><Crop size={17}/> Kadravimas</button><button className={`tab ${activeTab === 'quality' ? 'active' : ''}`} onClick={() => setActiveTab('quality')}><Images size={17}/> Nuotraukos kokybė</button></nav>{activeTab === 'crop' && <div className="top-actions"><span className="batch-count">{photos.length ? `Nuotraukų partija · ${photos.length} fail.` : 'Nauja nuotraukų partija'}</span><button className="icon-button" title="Kokybės nustatymai" onClick={() => setSettingsOpen(true)}><Settings2 size={19}/></button><button className="download-button" onClick={exportAll} disabled={!photos.length || busy}><Download size={17}/> Atsisiųsti viską <span className="zip-pill">ZIP</span></button></div>}</header>
+    {activeTab === 'quality' ? qualityTabView : <><main className="workspace">
       <aside className="left-panel"><div className="panel-title">1. Spausdinimo formatas</div><div className="select-wrap format-select"><select value={currentFormatId} disabled={selectedMode === 'free'} onChange={e => changeFormat(e.target.value)}>{FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}<option value="custom">Pagal skaičius</option></select></div>
         <div className="custom-format"><div className="custom-format-title">Rankinis formatas</div><div className="custom-format-fields"><input disabled={selectedMode === "free"} aria-label="Pirmas matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[0]} onChange={e => changeCustom(0, e.target.value)}/><span>×</span><input disabled={selectedMode === "free"} aria-label="Antras matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[1]} onChange={e => changeCustom(1, e.target.value)}/></div></div>
         <div className="section-divider"/><div className="panel-title">2. Kadravimo tipas</div><div className="mode-list"><button className={selectedMode === 'crop' ? 'mode selected' : 'mode'} onClick={() => { setMode('crop'); if (active) patchActive({ mode: 'crop' }); }}><Crop/><span>Kadravimas</span></button><button className={selectedMode === 'fit' ? 'mode selected' : 'mode'} onClick={() => { setMode('fit'); if (active) patchActive({ mode: 'fit' }); }}><Square/><span>Įtalpinta</span></button><button className={selectedMode === 'real' ? 'mode selected' : 'mode'} onClick={() => { setMode('real'); if (active) patchActive({ mode: 'real' }); }}><Ruler/><span>Real Size<small>320 DPI</small></span></button><button className={selectedMode === 'free' ? 'mode selected' : 'mode'} onClick={() => { setMode('free'); if (active) patchActive({ mode: 'free', zoom: 1, pan: { x: 0, y: 0 }, freeCrop: { x: 0, y: 0, w: active.width, h: active.height } }); }}><Crop/><span>Laisvas</span></button></div><button className="apply-all-button" onClick={() => applyModeToAll(selectedMode)} disabled={!photos.length}>Taikyti visoms nuotraukoms</button>
@@ -551,7 +715,8 @@ function App() {
       onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
       onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDropZone(''); }}
       onDrop={e => handleDrop(e, 'strip')}><div className="strip-head"><div><b>Nuotraukų eilė</b><span>{photos.length} nuotraukos</span></div><div className="strip-tools"><button onClick={() => fileRef.current?.click()}><ImagePlus size={16}/> Pridėti</button><button onClick={() => { photos.forEach(p => URL.revokeObjectURL(p.url)); setPhotos([]); setActiveId(null); }}>Išvalyti partiją</button></div></div><div className="strip-body"><button className="strip-arrow" onClick={() => stripRef.current?.scrollBy({ left: -240, behavior: 'smooth' })}><ChevronLeft/></button><div className="thumb-list" ref={stripRef} onWheel={e => { if (stripRef.current) { e.preventDefault(); stripRef.current.scrollLeft += Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX; } }}>{photos.map((p, i) => <div key={p.id} className={`thumb-card ${p.id === activeId ? 'active' : ''}`}><button className="thumb-select" onClick={() => navigateTo(p.id)}><div className={`thumb-image status-${p.status}`}><img src={thumbSources.get(p.id) || p.url} /></div><span className="thumb-label">{p.name}</span></button><div className="thumb-copies"><button aria-label={`Mažinti ${p.name} kopijų skaičių`} onClick={() => updatePhoto(p.id, { copies: Math.max(1, (p.copies || 1) - 1) })} disabled={(p.copies || 1) <= 1}>−</button><b>{p.copies || 1}</b><button aria-label={`Didinti ${p.name} kopijų skaičių`} onClick={() => updatePhoto(p.id, { copies: Math.min(99, (p.copies || 1) + 1) })}>＋</button><button className="thumb-delete" title="Pašalinti nuotrauką" aria-label={`Pašalinti ${p.name}`} onClick={() => deletePhoto(p.id)}><Trash2 size={14}/></button></div></div>)}</div><button className="strip-arrow" onClick={() => stripRef.current?.scrollBy({ left: 240, behavior: 'smooth' })}><ChevronRight/></button></div><div className="strip-bottom"><div className="strip-message">{busy ? <><Loader2 className="spin" size={14}/>{message}</> : message}</div></div></section>
-    {settingsOpen && <div className="settings-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setSettingsOpen(false); }}>
+    </>}
+    {settingsOpen && activeTab === 'crop' && <div className="settings-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setSettingsOpen(false); }}>
       <section className="quality-settings" role="dialog" aria-modal="true" aria-label="Kokybės nustatymai">
         <div className="settings-heading"><div><b>Spausdinimo kokybės skalė</b><small>Keiskite tikslinę raišką pagal fizinį spaudinio dydį</small></div><button onClick={() => setSettingsOpen(false)}>✕</button></div>
         <div className="quality-table"><div className="quality-table-head"><span>Formatas</span><span>Ilgoji kraštinė (cm)</span><span>Tikslas (DPI)</span></div>
