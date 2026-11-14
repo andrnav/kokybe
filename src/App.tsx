@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, CheckCircle2, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap } from 'lucide-react'
-import { Mode, Profile, chooseProfile, ppi, profiles, printGrade, qualityWord, runIqa } from './analysis'
+import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap } from 'lucide-react'
+import type { Mode } from './analysis'
+import { chooseProfile, ppi, profiles, printGrade, qualityWord, runIqa } from './analysis'
 
 type Result = Awaited<ReturnType<typeof runIqa>>
 const modes: { id: Mode; title: string; desc: string; icon: typeof Cpu }[] = [
