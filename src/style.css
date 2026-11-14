@@ -134,3 +134,9 @@
   .thumb-card{flex-basis:125px;width:125px}
   .thumb-select .thumb-image{height:78px}
 }
+
+/* Drag-and-drop targets */
+.stage.drag-over{outline:3px dashed #55a5ff;outline-offset:-8px;box-shadow:inset 0 0 0 9999px rgba(49,140,255,.10)}
+.filmstrip.drag-over{outline:2px dashed #55a5ff;outline-offset:-5px;background:rgba(49,140,255,.08)}
+.thumb-copies .thumb-delete{margin-left:auto;width:27px;height:24px;display:grid;place-items:center;border:1px solid #70404a;border-radius:6px;background:#38252d;color:#ff9aa7;padding:0}
+.thumb-copies .thumb-delete:hover{background:#5a2d38;color:#fff}
