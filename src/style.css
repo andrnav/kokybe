@@ -298,3 +298,17 @@
 .quality-summary-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media(max-width:900px){.quality-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.quality-summary-grid{grid-template-columns:1fr}.quality-overlay-toggle{align-items:flex-start;flex-direction:column}}
+
+/* v2.5.0 – perkelti Kadruoklis kokybės vertinimo nustatymai */
+.quality-config-details summary{display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;list-style:none}
+.quality-config-details summary::-webkit-details-marker{display:none}
+.quality-config-details summary span{color:#9fb0c4;font-size:11px;font-weight:500}
+.quality-config-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+.quality-config-grid label{display:flex;flex-direction:column;gap:5px;color:#aebed0;font-size:11px}
+.quality-config-grid input{width:100%;min-width:0;border:1px solid #405166;border-radius:7px;background:#111a26;color:#e7edf5;padding:8px;font:inherit;font-size:13px}
+.quality-config-details>button{margin:2px 0 8px}
+.quality-config-details>small{display:block;color:#91a2b6;font-size:11px}
+.quality-reason-ok{color:#a9d8b8}
+.quality-reason-warn{color:#f2cf83}
+.quality-reason-bad{color:#f2a0a0}
+@media(max-width:600px){.quality-config-grid{grid-template-columns:1fr}}

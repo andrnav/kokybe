@@ -241,6 +241,112 @@ function renderPhoto(photo, canvas, { thumbnail = false } = {}) {
   ctx.drawImage(photo.image, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, canvas.width, canvas.height);
 }
 
+
+const KADRUOKLIS_DEFAULTS = {
+  maxMinilabCm: 30.5, k: 1.25, minCm: 30, maxCm: 60,
+  fractions: { excellent: 0.90, good: 0.70, suitable: 0.50, borderline: 0.35 },
+  printers: {
+    noritsu: { name: 'Noritsu QSS-3701 (Fuji DP II)', nativeDpi: 300 },
+    mimaki: { name: 'Mimaki JV100-160', nativeDpi: 360 }
+  },
+  sharp: { veryBlurry: 25, blurry: 80, sharp: 200 },
+  noise: { moderate: 2.5, high: 4.5 },
+  exposure: { brightClipBad: 8, darkMean: 35, brightMean: 220 }
+};
+
+function kadruoklisPercentile(values, q) {
+  if (!values.length) return null;
+  const sorted=[...values].sort((a,b)=>a-b);
+  return sorted[Math.min(sorted.length-1,Math.max(0,Math.round((sorted.length-1)*q)))];
+}
+
+function kadruoklisTileStats(rgba,w,h) {
+  const gray=new Float32Array(w*h);
+  for(let i=0,j=0;i<gray.length;i++,j+=4) gray[i]=.299*rgba[j]+.587*rgba[j+1]+.114*rgba[j+2];
+  let sum=0,sum2=0;
+  for(let i=0;i<gray.length;i++){sum+=gray[i];sum2+=gray[i]*gray[i];}
+  const mean=sum/gray.length,std=Math.sqrt(Math.max(0,sum2/gray.length-mean*mean));
+  let lapSum=0,lapSq=0,noiseAbs=0,n=0;
+  for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+    const i=y*w+x;
+    const lap=gray[i-w]+gray[i+w]+gray[i-1]+gray[i+1]-4*gray[i];
+    lapSum+=lap;lapSq+=lap*lap;
+    const high=gray[i-w-1]-2*gray[i-w]+gray[i-w+1]-2*gray[i-1]+4*gray[i]-2*gray[i+1]+gray[i+w-1]-2*gray[i+w]+gray[i+w+1];
+    noiseAbs+=Math.abs(high);n++;
+  }
+  const lapVar=n?Math.max(0,lapSq/n-(lapSum/n)**2):0;
+  const sigma=n?Math.sqrt(Math.PI/2)*noiseAbs/(6*n):0;
+  return {mean,std,lapVar,sigma};
+}
+
+function kadruoklisExposureStats(rgba) {
+  const hist=new Uint32Array(256);let n=0,sum=0;
+  for(let i=0;i<rgba.length;i+=4){const y=Math.round(.299*rgba[i]+.587*rgba[i+1]+.114*rgba[i+2]);hist[y]++;sum+=y;n++;}
+  let dark=0,bright=0;
+  for(let v=0;v<=8;v++)dark+=hist[v];
+  for(let v=247;v<=255;v++)bright+=hist[v];
+  const pct=q=>{let c=0;for(let v=0;v<256;v++){c+=hist[v];if(c>=q*n)return v;}return 255;};
+  return {mean:n?sum/n:0,dark:n?dark/n*100:0,bright:n?bright/n*100:0,p2:pct(.02),p98:pct(.98)};
+}
+
+function analyzeKadruoklisMetrics(canvas) {
+  const W=canvas.width,H=canvas.height;
+  const smallScale=Math.min(1,512/Math.max(W,H));
+  const sw=Math.max(1,Math.round(W*smallScale)),sh=Math.max(1,Math.round(H*smallScale));
+  const small=document.createElement('canvas');small.width=sw;small.height=sh;
+  const sx=small.getContext('2d',{willReadFrequently:true});sx.imageSmoothingQuality='high';sx.drawImage(canvas,0,0,sw,sh);
+  const exposure=kadruoklisExposureStats(sx.getImageData(0,0,sw,sh).data);small.width=small.height=0;
+  const T=Math.min(256,W,H),tiles=[];
+  if(T>=24){
+    const nx=Math.min(7,Math.max(1,Math.floor(W/T))),ny=Math.min(7,Math.max(1,Math.floor(H/T)));
+    const tc=document.createElement('canvas');tc.width=T;tc.height=T;
+    const tx=tc.getContext('2d',{willReadFrequently:true});
+    for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){
+      const px=Math.round((W-T)*(nx===1?.5:i/(nx-1))),py=Math.round((H-T)*(ny===1?.5:j/(ny-1)));
+      tx.drawImage(canvas,px,py,T,T,0,0,T,T);
+      tiles.push({x:px,y:py,size:T,...kadruoklisTileStats(tx.getImageData(0,0,T,T).data,T,T)});
+    }
+    tc.width=tc.height=0;
+  }
+  const noise=kadruoklisPercentile(tiles.map(t=>t.sigma),.25);
+  const noiseVariance=(noise||0)**2;
+  tiles.forEach(t=>t.correctedSharpness=Math.max(0,t.lapVar-20*noiseVariance));
+  const textured=tiles.filter(t=>t.std>=8);
+  const sharp=textured.length>=2?kadruoklisPercentile(textured.map(t=>t.correctedSharpness),.9):null;
+  const patches=[...textured].sort((a,b)=>b.correctedSharpness-a.correctedSharpness).slice(0,4).map(t=>({x:t.x,y:t.y,size:t.size}));
+  return {sharp,noise,exposure,tiles:tiles.length,patches,patchSharpness:tiles.map(t=>t.correctedSharpness),texturedTiles:textured.length};
+}
+
+function kadruoklisPrintContext(cmW,cmH,config=KADRUOKLIS_DEFAULTS) {
+  const short=Math.min(cmW,cmH),long=Math.max(cmW,cmH);
+  const printer=short<=config.maxMinilabCm?'noritsu':'mimaki';
+  const profile=config.printers[printer];
+  const viewingCm=Math.min(config.maxCm,Math.max(config.minCm,config.k*Math.hypot(cmW,cmH)));
+  const requiredDpi=Math.min(3438/(viewingCm/2.54),profile.nativeDpi);
+  return {printer,printerName:profile.name,nativeDpi:profile.nativeDpi,viewingCm,requiredDpi};
+}
+
+function evaluateKadruoklisQuality({dpi,cmW,cmH,metrics,config=KADRUOKLIS_DEFAULTS}) {
+  const ctx=kadruoklisPrintContext(cmW,cmH,config),f=config.fractions;
+  const sharpFactor=metrics?.sharp==null?1:metrics.sharp < config.sharp.veryBlurry ? 0.5 : metrics.sharp < config.sharp.blurry ? 0.75 : 1;
+  const effectiveDpi=dpi*sharpFactor,ratio=effectiveDpi/ctx.requiredDpi;
+  const resolutionLevel=ratio>=f.excellent?5:ratio>=f.good?4:ratio>=f.suitable?3:ratio>=f.borderline?2:1;
+  const reasons=[{tone:resolutionLevel>=4?'ok':resolutionLevel===3?'warn':'bad',text:`Efektyvi raiška ${Math.round(dpi)} DPI${sharpFactor<1?` (po ryškumo korekcijos ~${Math.round(effectiveDpi)} DPI)`:''}. ${ctx.printerName}; rekomenduojama ≥ ${Math.round(ctx.requiredDpi*f.good)} DPI, labai gerai ≥ ${Math.round(ctx.requiredDpi*f.excellent)} DPI.`}];
+  let penalty=0;
+  if(metrics){
+    if(metrics.sharp==null)reasons.push({tone:'warn',text:'Ryškumo įvertinti nepavyko: nepakanka tekstūrinių sričių.'});
+    else if(metrics.sharp<config.sharp.veryBlurry)reasons.push({tone:'bad',text:`Labai silpnas detalumo signalas (${metrics.sharp.toFixed(1)}); efektyvi raiška sumažinta 50%.`});
+    else if(metrics.sharp<config.sharp.blurry)reasons.push({tone:'warn',text:`Silpnesnis detalumo signalas (${metrics.sharp.toFixed(1)}); efektyvi raiška sumažinta 25%.`});
+    else reasons.push({tone:'ok',text:`Detalumo rodiklis ${metrics.sharp.toFixed(1)}: ${metrics.sharp>=config.sharp.sharp?'geras':'pakankamas'}.`});
+    if(metrics.noise!=null){if(metrics.noise>=config.noise.high){penalty++;reasons.push({tone:'warn',text:`Didelis triukšmas (Immerkaer σ ${metrics.noise.toFixed(2)}).`});}else reasons.push({tone:'ok',text:`Triukšmas ${metrics.noise>=config.noise.moderate?'vidutinis':'nedidelis'} (σ ${metrics.noise.toFixed(2)}).`});}
+    const e=metrics.exposure;
+    if(e){const issues=[];if(e.bright>=config.exposure.brightClipBad)issues.push(`išdegę šviesūs plotai ${e.bright.toFixed(1)}%`);if(e.mean<=config.exposure.darkMean)issues.push('labai tamsus bendras vaizdas');if(e.mean>=config.exposure.brightMean)issues.push('labai šviesus bendras vaizdas');if(issues.length){penalty++;reasons.push({tone:'warn',text:`Ekspozicijos rizika: ${issues.join(', ')}.`});}else reasons.push({tone:'ok',text:`Ekspozicija normali (vidurkis ${Math.round(e.mean)}/255; tamsūs pikseliai ${e.dark.toFixed(1)}%).`});}
+  }
+  const level=Math.max(1,resolutionLevel-Math.min(penalty,2));
+  const labels={5:'Puiki',4:'Gera',3:'Tinka',2:'Ribinė',1:'Bloga'};
+  return {...ctx,level,label:labels[level],resolutionLevel,effectiveDpi,sharpFactor,ratio,penalty,reasons};
+}
+
 function calculateSharpnessGrid(image) {
   const cols=8, rows=8, canvas=document.createElement('canvas');
   const scale=Math.min(1,768/Math.max(image.naturalWidth,image.naturalHeight));
@@ -377,6 +483,7 @@ function App() {
   const [qualityProgress, setQualityProgress] = useState('');
   const [qualityResult, setQualityResult] = useState(null);
   const [qualityOverlayVisible, setQualityOverlayVisible] = useState(true);
+  const [kadruoklisConfig, setKadruoklisConfig] = useState(() => { try { const saved=JSON.parse(localStorage.getItem('foto-inspektorius-kadruoklis-quality')); return saved ? {...KADRUOKLIS_DEFAULTS,...saved,fractions:{...KADRUOKLIS_DEFAULTS.fractions,...saved.fractions},printers:{...KADRUOKLIS_DEFAULTS.printers,...saved.printers},sharp:{...KADRUOKLIS_DEFAULTS.sharp,...saved.sharp},noise:{...KADRUOKLIS_DEFAULTS.noise,...saved.noise},exposure:{...KADRUOKLIS_DEFAULTS.exposure,...saved.exposure}} : KADRUOKLIS_DEFAULTS; } catch { return KADRUOKLIS_DEFAULTS; } });
   const [qualityCropZoom, setQualityCropZoom] = useState(1);
   const [qualityPan, setQualityPan] = useState({ x: 0, y: 0 });
   const qualityFileRef = useRef(null);
@@ -400,6 +507,8 @@ function App() {
   }, [activeId]);
   useEffect(() => () => photos.forEach(p => URL.revokeObjectURL(p.url)), []);
   useEffect(() => { localStorage.setItem('foto-inspektorius-quality-scale', JSON.stringify(qualityScale)); }, [qualityScale]);
+  useEffect(() => { localStorage.setItem('foto-inspektorius-kadruoklis-quality', JSON.stringify(kadruoklisConfig)); }, [kadruoklisConfig]);
+  useEffect(() => { setQualityResult(null); setQualityStatus('idle'); }, [kadruoklisConfig]);
   useEffect(() => {
     const node = stageRef.current;
     if (!node) return;
@@ -735,10 +844,11 @@ function App() {
     const oriented = createOrientedCanvas(qualityImage.image, qualityRotation);
     const crop = getQualityCropGeometry(oriented.width, oriented.height, qualityDimensions, qualityCropZoom, qualityPan);
     const dpiX = crop.sw / (qualityDimensions[0] / 2.54), dpiY = crop.sh / (qualityDimensions[1] / 2.54);
-    const targetDpi = getTargetDpi(Math.max(...qualityDimensions), qualityScale);
+    const printContext = kadruoklisPrintContext(qualityDimensions[0], qualityDimensions[1], kadruoklisConfig);
+    const targetDpi = printContext.requiredDpi;
     const ratio = Math.min(dpiX, dpiY) / targetDpi;
-    return { width: Math.round(crop.sw), height: Math.round(crop.sh), dpiX, dpiY, targetDpi, ratio, rating: calculatePrintRating(Math.min(dpiX, dpiY), targetDpi, 0) };
-  }, [qualityImage, qualityDimensions, qualityCropZoom, qualityPan, qualityRotation, qualityScale]);
+    return { width: Math.round(crop.sw), height: Math.round(crop.sh), dpiX, dpiY, targetDpi, ratio, printContext, rating: calculatePrintRating(Math.min(dpiX, dpiY), targetDpi, 0) };
+  }, [qualityImage, qualityDimensions, qualityCropZoom, qualityPan, qualityRotation, kadruoklisConfig]);
 
   const runQualityAnalysis = async () => {
     if (!qualityImage || ['loading','running'].includes(qualityStatus)) return;
@@ -751,13 +861,17 @@ function App() {
         try{const decoded=await blobToImage(blob);resolve(decoded.image);}catch(e){reject(e);}
       },'image/png'));
       const visual=analyzeCropVisualMetrics(croppedImage);
+      const kadruoklisMetrics=analyzeKadruoklisMetrics(cropCanvas);
       const [wCm,hCm]=qualityDimensions;
       const dpiX=cropCanvas.width/(wCm/2.54),dpiY=cropCanvas.height/(hCm/2.54);
-      const targetDpi=getTargetDpi(Math.max(wCm,hCm),qualityScale);
+      const printContext=kadruoklisPrintContext(wCm,hCm,kadruoklisConfig);
+      const targetDpi=printContext.requiredDpi;
       const weakTiles=visual.weakCount;
       const rating=calculatePrintRating(Math.min(dpiX,dpiY),targetDpi,0);
+      const kadruoklisEvaluation=evaluateKadruoklisQuality({dpi:Math.min(dpiX,dpiY),cmW:wCm,cmH:hCm,metrics:kadruoklisMetrics,config:kadruoklisConfig});
       const summary=buildQualitySummary({ratio:Math.min(dpiX,dpiY)/targetDpi,rating},visual);
-      setQualityResult({grid:visual.grid,dpiX,dpiY,width:cropCanvas.width,height:cropCanvas.height,weakTiles,targetDpi,rating,visual,summary,analyzedAt:new Date().toISOString()});
+      summary.verdict=`${kadruoklisEvaluation.label}. ${kadruoklisEvaluation.reasons.filter(r=>r.tone!=='ok').map(r=>r.text).join(' ') || 'Ryškių perspėjimo požymių nenustatyta.'}`;
+      setQualityResult({grid:visual.grid,dpiX,dpiY,width:cropCanvas.width,height:cropCanvas.height,weakTiles,targetDpi,rating,visual,summary,kadruoklisMetrics,kadruoklisEvaluation,analyzedAt:new Date().toISOString()});
       setQualityStatus('done');
       setQualityProgress('Analizė baigta. Naudoti matematiniai vaizdo analizės metodai. AI modeliai nebuvo paleisti.');
     }catch(error){console.error('Matematinė analizė nepavyko:',error);setQualityStatus('error');setQualityProgress(`Analizė nepavyko: ${error.message||'nežinoma klaida'}`);}
@@ -792,7 +906,8 @@ function App() {
       {qualityResult && <section className="quality-summary-card">
         <div className="quality-summary-heading"><div><small>MATEMATINĖS ANALIZĖS SANTRAUKA</small><h3>Apkirpto kadro rezultatai</h3></div><span className="quality-summary-status">{qualityResult.summary.resolution}</span></div>
         <div className="quality-summary-grid">
-          <div><small>Spaudos raiška</small><b>{Math.round(Math.min(qualityResult.dpiX,qualityResult.dpiY))} DPI</b><span>Tikslas {Math.round(qualityResult.targetDpi)} DPI · {qualityResult.summary.resolution.toLowerCase()}</span></div>
+          <div><small>„Kadruoklis“ spaudos įvertinimas</small><b>{qualityResult.kadruoklisEvaluation.level}/5 · {qualityResult.kadruoklisEvaluation.label}</b><span>{qualityResult.kadruoklisEvaluation.printerName} · žiūrėjimo atstumas ~{Math.round(qualityResult.kadruoklisEvaluation.viewingCm)} cm</span></div>
+          <div><small>Efektyvi raiška</small><b>{Math.round(qualityResult.kadruoklisEvaluation.effectiveDpi)} DPI</b><span>Reikia {Math.round(qualityResult.targetDpi)} DPI · ryškumo daugiklis {Math.round(qualityResult.kadruoklisEvaluation.sharpFactor*100)}%</span></div>
           <div><small>Detalumo / ryškumo signalas</small><b>{qualityResult.visual.sharpness}</b><span>{qualityResult.summary.detail}</span></div>
           <div><small>Laplacian Variance</small><b>{qualityResult.visual.lapVariance.toLocaleString('lt-LT')}</b><span>Gretimų pikselių šviesumo pokyčių dispersija</span></div>
           <div><small>Tenengrad</small><b>{qualityResult.visual.tenengrad.toLocaleString('lt-LT')}</b><span>Sobel kraštų stiprumo matas</span></div>
@@ -802,6 +917,36 @@ function App() {
           <div><small>Ekspozicija / kontrastas</small><b>{qualityResult.visual.exposure}</b><span>Kontrastas: {qualityResult.visual.contrast} · išdegimas: {qualityResult.visual.clipping}%</span></div>
         </div>
         <p className="quality-summary-verdict"><b>Galutinė išvada:</b> {qualityResult.summary.verdict}</p>
+        <div className="quality-score-explanation">
+          <b>„Kadruoklis“ vertinimo pagrindas</b>
+          <ul>{qualityResult.kadruoklisEvaluation.reasons.map((r,i)=><li key={i} className={`quality-reason-${r.tone}`}>{r.text}</li>)}</ul>
+          <p>Naudojamas žiūrėjimo atstumas: {kadruoklisConfig.k} × spaudinio įstrižainė, ribose {kadruoklisConfig.minCm}–{kadruoklisConfig.maxCm} cm. Spaudos įrenginys parenkamas pagal trumpąją kraštinę: iki {kadruoklisConfig.maxMinilabCm} cm – Noritsu ({kadruoklisConfig.printers.noritsu.nativeDpi} DPI), didesniems – Mimaki ({kadruoklisConfig.printers.mimaki.nativeDpi} DPI).</p>
+        </div>
+        <details className="quality-score-explanation quality-config-details">
+          <summary><b>Vertinimo nustatymai</b> <span>Keisti slenksčius</span></summary>
+          <div className="quality-config-grid">
+            <label>Žiūrėjimo atstumo daugiklis<input type="number" min="0.5" max="3" step="0.05" value={kadruoklisConfig.k} onChange={e=>setKadruoklisConfig(c=>({...c,k:Math.max(.5,Number(e.target.value)||1.25)}))}/></label>
+            <label>Minimalus atstumas (cm)<input type="number" min="10" max="200" value={kadruoklisConfig.minCm} onChange={e=>setKadruoklisConfig(c=>({...c,minCm:Math.max(10,Number(e.target.value)||30)}))}/></label>
+            <label>Maksimalus atstumas (cm)<input type="number" min="10" max="300" value={kadruoklisConfig.maxCm} onChange={e=>setKadruoklisConfig(c=>({...c,maxCm:Math.max(10,Number(e.target.value)||60)}))}/></label>
+            <label>Noritsu riba (cm)<input type="number" min="10" max="100" step=".5" value={kadruoklisConfig.maxMinilabCm} onChange={e=>setKadruoklisConfig(c=>({...c,maxMinilabCm:Math.max(10,Number(e.target.value)||30.5)}))}/></label>
+            <label>Noritsu DPI<input type="number" min="72" max="1200" value={kadruoklisConfig.printers.noritsu.nativeDpi} onChange={e=>setKadruoklisConfig(c=>({...c,printers:{...c.printers,noritsu:{...c.printers.noritsu,nativeDpi:Math.max(72,Number(e.target.value)||300)}}}))}/></label>
+            <label>Mimaki DPI<input type="number" min="72" max="1200" value={kadruoklisConfig.printers.mimaki.nativeDpi} onChange={e=>setKadruoklisConfig(c=>({...c,printers:{...c.printers,mimaki:{...c.printers.mimaki,nativeDpi:Math.max(72,Number(e.target.value)||360)}}}))}/></label>
+            <label>Labai neryški, jei Laplasas mažiau<input type="number" min="0" max="1000" value={kadruoklisConfig.sharp.veryBlurry} onChange={e=>setKadruoklisConfig(c=>({...c,sharp:{...c.sharp,veryBlurry:Math.max(0,Number(e.target.value)||0)}}))}/></label>
+            <label>Geras detalumas nuo<input type="number" min="0" max="5000" value={kadruoklisConfig.sharp.sharp} onChange={e=>setKadruoklisConfig(c=>({...c,sharp:{...c.sharp,sharp:Math.max(0,Number(e.target.value)||0)}}))}/></label>
+            <label>Vidutinis triukšmas nuo σ<input type="number" min="0" max="50" step=".1" value={kadruoklisConfig.noise.moderate} onChange={e=>setKadruoklisConfig(c=>({...c,noise:{...c.noise,moderate:Math.max(0,Number(e.target.value)||0)}}))}/></label>
+            <label>„Puiki“ nuo reikiamos DPI dalies<input type="number" min=".1" max="2" step=".05" value={kadruoklisConfig.fractions.excellent} onChange={e=>setKadruoklisConfig(c=>({...c,fractions:{...c.fractions,excellent:Math.max(.1,Number(e.target.value)||.9)}}))}/></label>
+            <label>„Gera“ nuo reikiamos DPI dalies<input type="number" min=".1" max="2" step=".05" value={kadruoklisConfig.fractions.good} onChange={e=>setKadruoklisConfig(c=>({...c,fractions:{...c.fractions,good:Math.max(.1,Number(e.target.value)||.7)}}))}/></label>
+            <label>„Tinka“ nuo reikiamos DPI dalies<input type="number" min=".1" max="2" step=".05" value={kadruoklisConfig.fractions.suitable} onChange={e=>setKadruoklisConfig(c=>({...c,fractions:{...c.fractions,suitable:Math.max(.1,Number(e.target.value)||.5)}}))}/></label>
+            <label>„Ribinė“ nuo reikiamos DPI dalies<input type="number" min=".1" max="2" step=".05" value={kadruoklisConfig.fractions.borderline} onChange={e=>setKadruoklisConfig(c=>({...c,fractions:{...c.fractions,borderline:Math.max(.1,Number(e.target.value)||.35)}}))}/></label>
+            <label>Labai tamsu, jei vidurkis mažiau<input type="number" min="0" max="255" value={kadruoklisConfig.exposure.darkMean} onChange={e=>setKadruoklisConfig(c=>({...c,exposure:{...c.exposure,darkMean:Math.max(0,Number(e.target.value)||35)}}))}/></label>
+            <label>Labai šviesu, jei vidurkis daugiau<input type="number" min="0" max="255" value={kadruoklisConfig.exposure.brightMean} onChange={e=>setKadruoklisConfig(c=>({...c,exposure:{...c.exposure,brightMean:Math.max(0,Number(e.target.value)||220)}}))}/></label>
+            <label>Neryški, jei Laplasas mažiau<input type="number" min="0" max="2000" value={kadruoklisConfig.sharp.blurry} onChange={e=>setKadruoklisConfig(c=>({...c,sharp:{...c.sharp,blurry:Math.max(0,Number(e.target.value)||0)}}))}/></label>
+            <label>Didelis triukšmas nuo σ<input type="number" min="0" max="50" step=".1" value={kadruoklisConfig.noise.high} onChange={e=>setKadruoklisConfig(c=>({...c,noise:{...c.noise,high:Math.max(0,Number(e.target.value)||0)}}))}/></label>
+            <label>Išdegę šviesūs plotai nuo (%)<input type="number" min="0" max="100" step=".5" value={kadruoklisConfig.exposure.brightClipBad} onChange={e=>setKadruoklisConfig(c=>({...c,exposure:{...c.exposure,brightClipBad:Math.max(0,Number(e.target.value)||0)}}))}/></label>
+          </div>
+          <button className="secondary" onClick={()=>setKadruoklisConfig(KADRUOKLIS_DEFAULTS)}>Atkurti pradinius nustatymus</button>
+          <small>Nustatymai išsaugomi šioje naršyklėje. Pakeitus juos, atlikite analizę iš naujo.</small>
+        </details>
         <div className="quality-score-explanation"><b>Kaip sudaryti rezultatai?</b><ul>
           <li><b>Raiška:</b> apkirpto kadro pikseliai dalijami iš pasirinkto spaudos dydžio coliais.</li>
           <li><b>Laplacian Variance:</b> matuoja gretimų pikselių šviesumo pokyčių dispersiją.</li>

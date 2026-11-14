@@ -56,3 +56,11 @@ Po analizės pateikiama viena aiški apkirpto kadro santrauka: spaudos tinkamuma
 
 ## v2.4.2 pataisymas
 - Atkurta trūkstama `Sparkles` piktogramos importo deklaracija, dėl kurios naršyklėje įvykdavo `ReferenceError` ir puslapis likdavo tuščias.
+
+
+## v2.5.0 – „Kadruoklis“ vertinimo logikos perkėlimas
+- Perkelta spaudos vertinimo logika: žiūrėjimo atstumas, Noritsu/Mimaki profiliai, efektyvios raiškos korekcija pagal ryškumą, Immerkaer triukšmo įvertis, ekspozicijos histogramų statistika ir 5 kokybės lygiai.
+- Analizuojamas galutinis apkirptas kadras, o ne pradinis originalas.
+- Vertinimo ribas galima keisti rezultatų skiltyje; jos saugomos naršyklėje.
+- Claude projekto `ai.js` neperkeltas: jis naudoja bendrą CLIP zero-shot modelį ir tekstines poras, ne atskirai išmokytą CLIP-IQA modelį.
+- Perkelti skaitiniai slenksčiai yra pradinės heuristikos. Juos būtina kalibruoti su realiais spaudos pavyzdžiais.
