@@ -27,7 +27,7 @@ const MODELS: Record<Mode, ModelConfig> = {
     name: 'HyperIQA', modelFile: 'hyperiqa_model.onnx', externalFile: 'hyperiqa_model.onnx.data',
     modelUrl: `${HF}/hyperiqa_model.onnx`, externalUrl: `${HF}/hyperiqa_model.onnx.data`,
     scoreScale: 'raw', normalization: 'imagenet',
-    description: 'HyperIQA; ImageNet normalization'
+    description: 'HyperIQA; ImageNet normalization; raw regression output'
   },
   light: {
     name: 'DBCNN', modelFile: 'dbcnn_model.onnx', externalFile: 'dbcnn_model.onnx.data',
@@ -181,7 +181,7 @@ export async function runIqa(image: HTMLImageElement, mode: Mode, onProgress: (v
 
     const rawScore = scores.reduce((sum, value) => sum + value, 0) / scores.length
     const score = config.scoreScale === '0-1' ? rawScore * 100 : rawScore
-    if (config.scoreScale !== 'raw' && (score < 0 || score > 100)) throw new Error(`${config.name} grąžino ${rawScore.toFixed(4)}, o tikėtinas diapazonas yra ${config.scoreScale}.`)
+    if (config.scoreScale === '0-100' && (score < 0 || score > 100)) throw new Error(`${config.name} grąžino neįprastą reikšmę: ${rawScore.toFixed(4)}.`)
     return { score: Math.round(score), rawScore, model: config.name, provider, durationMs: Math.round(performance.now() - started) }
   } finally {
     await session.release()

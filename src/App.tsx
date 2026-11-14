@@ -1,6 +1,6 @@
 import type React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap, Crop, Calculator, Sparkles, Download, Move, ZoomIn } from 'lucide-react'
+import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap, Crop, Calculator, Sparkles, Download, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
 import type { Mode, Profile } from './analysis'
 import { printGrade, qualityWord, runIqa } from './analysis'
 
@@ -9,13 +9,7 @@ type PrintKind = 'photo' | 'wide'
 const photoFormats = [[9,13],[10,15],[13,18],[15,20],[20,30],[30,45]]
 const wideFormats = [[30,40],[40,60],[50,70],[50,75],[60,90],[70,100],[100,150]]
 const fmt = (w:number,h:number)=>`${w} × ${h} cm`
-
-function cropRect(iw:number, ih:number, ratio:number, zoom:number, x:number, y:number) {
-  const baseW = iw / ih > ratio ? ih * ratio : iw
-  const baseH = iw / ih > ratio ? ih : iw / ratio
-  const cw = baseW / zoom, ch = baseH / zoom
-  return { sx: (iw-cw)*x/100, sy: (ih-ch)*y/100, sw:cw, sh:ch }
-}
+type Rect = { x:number;y:number;width:number;height:number;scale:number;left:number;top:number;frameLeft:number;frameTop:number;frameWidth:number;frameHeight:number }
 
 export default function App() {
   const [file,setFile] = useState<File|null>(null)
@@ -24,91 +18,130 @@ export default function App() {
   const [kind,setKind] = useState<PrintKind>('photo')
   const [mode,setMode] = useState<Mode>('optimized')
   const [aiEnabled,setAiEnabled] = useState(false)
-  const [width,setWidth] = useState(13)
-  const [height,setHeight] = useState(18)
+  const [width,setWidth] = useState(20)
+  const [height,setHeight] = useState(30)
   const [custom,setCustom] = useState(false)
-  const [cropX,setCropX] = useState(50)
-  const [cropY,setCropY] = useState(50)
   const [zoom,setZoom] = useState(1)
+  const [pan,setPan] = useState({x:0,y:0})
+  const [stageSize,setStageSize] = useState({width:900,height:520})
   const [progress,setProgress] = useState(0)
   const [busy,setBusy] = useState(false)
   const [result,setResult] = useState<Result|null>(null)
   const [error,setError] = useState('')
   const [status,setStatus] = useState('Pasiruošusi')
   const [mathConfirmed,setMathConfirmed] = useState(false)
+  const [cropBlob,setCropBlob] = useState<Blob|null>(null)
+  const [cropUrl,setCropUrl] = useState('')
+  const [zoomPreview,setZoomPreview] = useState('fit')
   const inputRef = useRef<HTMLInputElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
-  const dragRef = useRef<{x:number;y:number;cx:number;cy:number}|null>(null)
+  const dragRef = useRef<{x:number;y:number;panX:number;panY:number}|null>(null)
   const profile:Profile = kind === 'photo' ? 'noritsu' : 'mimaki_poster'
   const ratio = width / height
-  const rect = image ? cropRect(image.naturalWidth,image.naturalHeight,ratio,zoom,cropX,cropY) : null
-  const cropPpi = image && rect ? Math.min(rect.sw/(width/2.54),rect.sh/(height/2.54)) : 0
   const activeFormats = kind === 'photo' ? photoFormats : wideFormats
-  const cropUrl = useMemo(()=>{
-    if(!image||!rect) return ''
-    const canvas=document.createElement('canvas'); canvas.width=Math.max(1,Math.round(rect.sw)); canvas.height=Math.max(1,Math.round(rect.sh))
-    const ctx=canvas.getContext('2d'); if(!ctx) return ''
-    ctx.drawImage(image,rect.sx,rect.sy,rect.sw,rect.sh,0,0,canvas.width,canvas.height)
-    return canvas.toDataURL('image/jpeg',0.98)
-  },[image,rect?.sx,rect?.sy,rect?.sw,rect?.sh])
-  useEffect(()=>{ if(!file) return; const next=URL.createObjectURL(file); const img=new Image(); img.onload=()=>{setImage(img);setUrl(next);setCropX(50);setCropY(50);setZoom(1);setResult(null);setMathConfirmed(false)}; img.onerror=()=>setError('Nepavyko atidaryti nuotraukos.'); img.src=next; return ()=>URL.revokeObjectURL(next) },[file])
-  function invalidate(){setMathConfirmed(false);setResult(null);setError('')}
-  function clear(){setFile(null);setImage(null);setUrl('');setResult(null);setError('');setProgress(0);setMathConfirmed(false);setAiEnabled(false)}
-  function chooseFormat(w:number,h:number){setWidth(w);setHeight(h);setCustom(false);invalidate();setCropX(50);setCropY(50);setZoom(1)}
-  function confirmCrop(){setMathConfirmed(true);setResult(null);setError('')}
-  function onPointerDown(e:React.PointerEvent<HTMLDivElement>){if(!image)return; e.currentTarget.setPointerCapture(e.pointerId);dragRef.current={x:e.clientX,y:e.clientY,cx:cropX,cy:cropY}}
-  function onPointerMove(e:React.PointerEvent<HTMLDivElement>){const d=dragRef.current;if(!d||!stageRef.current||!rect||!image)return;const box=stageRef.current.getBoundingClientRect();const dx=e.clientX-d.x,dy=e.clientY-d.y;const overflowX=image.naturalWidth-rect.sw,overflowY=image.naturalHeight-rect.sh;setCropX(Math.max(0,Math.min(100,d.cx-(dx/box.width)*overflowX/Math.max(1,overflowX)*100)));setCropY(Math.max(0,Math.min(100,d.cy-(dy/box.height)*overflowY/Math.max(1,overflowY)*100)))}
-  function onPointerUp(){dragRef.current=null}
-  function saveCrop(){if(!cropUrl)return;const a=document.createElement('a');a.href=cropUrl;a.download=`${file?.name.replace(/\.[^.]+$/,'')||'nuotrauka'}-${width}x${height}cm-crop.jpg`;a.click()}
-  async function analyse(){
-    if(!cropUrl||!mathConfirmed)return
-    setBusy(true);setResult(null);setError('');setProgress(0);setStatus('Paruošiamas AI modelis...')
-    try {const cropped=new Image();cropped.src=cropUrl;await cropped.decode();const r=await runIqa(cropped,mode,setProgress);setResult(r);setStatus('AI analizė baigta')}
-    catch(e){setError(e instanceof Error?e.message:String(e));setStatus('AI analizė nepavyko')}finally{setBusy(false)}
+
+  useEffect(()=>{
+    if(!stageRef.current) return
+    const el=stageRef.current
+    const update=()=>setStageSize({width:el.clientWidth,height:el.clientHeight})
+    update(); const ro=new ResizeObserver(update);ro.observe(el);return ()=>ro.disconnect()
+  },[image])
+  useEffect(()=>{ if(!file) return; const next=URL.createObjectURL(file); const img=new Image(); img.onload=()=>{setImage(img);setUrl(next);setZoom(1);setPan({x:0,y:0});setResult(null);setMathConfirmed(false);setCropBlob(null);setCropUrl('')}; img.onerror=()=>setError('Nepavyko atidaryti nuotraukos.'); img.src=next; return ()=>URL.revokeObjectURL(next) },[file])
+  useEffect(()=>()=>{if(cropUrl)URL.revokeObjectURL(cropUrl)},[cropUrl])
+
+  const rect:Rect|null=useMemo(()=>{
+    if(!image||!stageSize.width||!stageSize.height||width<=0||height<=0)return null
+    const fw=Math.min(stageSize.width*.86,stageSize.height*.86*ratio)
+    const fh=fw/ratio
+    const frameLeft=(stageSize.width-fw)/2,frameTop=(stageSize.height-fh)/2
+    const base=Math.max(fw/image.naturalWidth,fh/image.naturalHeight)
+    const scale=base*zoom
+    const iw=image.naturalWidth*scale,ih=image.naturalHeight*scale
+    const left=(stageSize.width-iw)/2+pan.x,top=(stageSize.height-ih)/2+pan.y
+    const x=Math.max(0,Math.min(image.naturalWidth,(frameLeft-left)/scale))
+    const y=Math.max(0,Math.min(image.naturalHeight,(frameTop-top)/scale))
+    const cw=Math.min(image.naturalWidth-x,fw/scale),ch=Math.min(image.naturalHeight-y,fh/scale)
+    return {x,y,width:cw,height:ch,scale,left,top,frameLeft,frameTop,frameWidth:fw,frameHeight:fh}
+  },[image,stageSize,ratio,zoom,pan])
+  const cropPpi=rect?Math.min(rect.width/(width/2.54),rect.height/(height/2.54)):0
+
+  function clear(){setFile(null);setImage(null);setUrl('');setResult(null);setError('');setProgress(0);setMathConfirmed(false);setAiEnabled(false);setCropBlob(null);setCropUrl('')}
+  function chooseFormat(w:number,h:number){setWidth(w);setHeight(h);setCustom(false);setResult(null);setMathConfirmed(false);setCropBlob(null);setCropUrl('');setZoom(1);setPan({x:0,y:0})}
+  function clampPan(next:{x:number;y:number},nextZoom=zoom){
+    if(!image)return next
+    const fw=Math.min(stageSize.width*.86,stageSize.height*.86*ratio),fh=fw/ratio
+    const s=Math.max(fw/image.naturalWidth,fh/image.naturalHeight)*nextZoom
+    const maxX=Math.max(0,(image.naturalWidth*s-fw)/2),maxY=Math.max(0,(image.naturalHeight*s-fh)/2)
+    return {x:Math.max(-maxX,Math.min(maxX,next.x)),y:Math.max(-maxY,Math.min(maxY,next.y))}
   }
+  function baseCropScale(){if(!image)return 1;const fw=Math.min(stageSize.width*.86,stageSize.height*.86*ratio),fh=fw/ratio;return Math.max(fw/image.naturalWidth,fh/image.naturalHeight)}
+  function setZoomLevel(z:number){const nz=Math.max(1,Math.min(10000,z));setZoom(nz);setPan(p=>clampPan(p,nz));setMathConfirmed(false);setCropBlob(null);setCropUrl('')}
+  function onPointerDown(e:React.PointerEvent){if(!image)return;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);dragRef.current={x:e.clientX,y:e.clientY,panX:pan.x,panY:pan.y}}
+  function onPointerMove(e:React.PointerEvent){if(!dragRef.current)return;const d=dragRef.current;setPan(clampPan({x:d.panX+e.clientX-d.x,y:d.panY+e.clientY-d.y}));setMathConfirmed(false);setCropBlob(null);setCropUrl('')}
+  function onPointerUp(){dragRef.current=null}
+  function getCropCanvas(){
+    if(!image||!rect)throw new Error('Nėra patvirtintos apkirpimo srities')
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(rect.width));canvas.height=Math.max(1,Math.round(rect.height))
+    const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Nepavyko paruošti apkirpimo')
+    ctx.drawImage(image,rect.x,rect.y,rect.width,rect.height,0,0,canvas.width,canvas.height)
+    return canvas
+  }
+  async function confirmCrop(){
+    if(!image||!rect)return
+    try{
+      const canvas=getCropCanvas()
+      const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Nepavyko išsaugoti apkirpimo')), 'image/png'))
+      const next=URL.createObjectURL(blob);setCropUrl(old=>{if(old)URL.revokeObjectURL(old);return next});setCropBlob(blob);setMathConfirmed(true);setResult(null);setError('');setStatus('Apkirpimas patvirtintas')
+    }catch(e){setError(e instanceof Error?e.message:String(e))}
+  }
+  function downloadCrop(){if(!cropUrl)return;const a=document.createElement('a');a.href=cropUrl;a.download=`${(file?.name||'nuotrauka').replace(/\.[^.]+$/,'')}-crop.png`;a.click()}
+  async function analyse(){
+    if(!cropBlob||!mathConfirmed)return
+    setBusy(true);setResult(null);setError('');setProgress(0);setStatus('Paruošiamas AI modelis...')
+    try{
+      const cropped=new Image();cropped.src=URL.createObjectURL(cropBlob);await cropped.decode()
+      try{const r=await runIqa(cropped,mode,setProgress);setResult(r);setStatus('AI analizė baigta')}finally{URL.revokeObjectURL(cropped.src)}
+    }catch(e){setError(e instanceof Error?e.message:String(e));setStatus('AI analizė nepavyko')}
+    finally{setBusy(false)}
+  }
+  const cropFrameStyle=rect?{left:rect.frameLeft,top:rect.frameTop,width:rect.frameWidth,height:rect.frameHeight}:undefined
+  const imageStyle=rect&&image?{left:rect.left,top:rect.top,width:image.naturalWidth*rect.scale,height:image.naturalHeight*rect.scale}:undefined
   const modes:{id:Mode;title:string;desc:string;icon:typeof Cpu}[]=[{id:'light',title:'Mažasis modelis',desc:'DBCNN',icon:Cpu},{id:'optimized',title:'Vidutinis modelis',desc:'HyperIQA',icon:Zap},{id:'full',title:'Maksimalus modelis',desc:'MUSIQ',icon:ScanEye}]
   const dragOver=(e:React.DragEvent)=>{e.preventDefault();e.stopPropagation()}
   const drop=(e:React.DragEvent)=>{dragOver(e);const f=e.dataTransfer.files?.[0];if(f?.type.startsWith('image/'))setFile(f)}
   return <main className="shell">
     <header className="top"><div className="brand"><div className="brandIcon"><ScanEye size={25}/></div><div><div className="eyebrow">FOTOLABORATORIJOS ĮRANKIS</div><h1>Photo Quality <span>AI</span></h1></div></div><div className="local"><ShieldCheck size={16}/> Nuotrauka apdorojama šiame kompiuteryje</div></header>
     <section className="intro"><div><div className="eyebrow">NUOTRAUKŲ DIAGNOSTIKA</div><h2>Patikrink prieš spausdindamas.</h2><p>Pirmiausia matematinis spaudos įvertinimas. AI analizė yra papildomas, pasirenkamas žingsnis.</p></div><div className="introMark"><Activity size={42}/></div></section>
-    <div className="workspace">
-      <aside className="sidebar">
-        <section className="panel"><div className="sectionTitle"><FileImage/><div><h3>1. Nuotrauka</h3><p>Įkelk arba nutempk failą</p></div></div>
-          <div className="drop compact" onDragOver={dragOver} onDrop={drop} onClick={()=>inputRef.current?.click()}><input ref={inputRef} type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f)setFile(f)}} hidden/><ImagePlus size={27}/><b>{file?'Pakeisti nuotrauką':'Įkelti nuotrauką'}</b><span>Drag & drop arba pasirink failą</span></div>
-          {file&&<div className="fileMeta sideMeta"><b>{file.name}</b><span>{image?`${image.naturalWidth} × ${image.naturalHeight} px`:'Kraunama...'}</span><button className="textBtn" onClick={clear}><Trash2 size={14}/> Pašalinti</button></div>}
-        </section>
-        <section className="panel"><div className="sectionTitle"><Gauge/><div><h3>2. Spaudos formatas</h3><p>Pasirink spaudos tipą ir dydį</p></div></div>
-          <div className="stack"><button className={`mode ${kind==='photo'?'selected':''}`} onClick={()=>{setKind('photo');chooseFormat(13,18)}}><b>Premium nuotrauka</b><small>Noritsu</small></button><button className={`mode ${kind==='wide'?'selected':''}`} onClick={()=>{setKind('wide');chooseFormat(40,60)}}><b>Didelio formato spauda</b><small>Mimaki</small></button></div>
-          <label className="field">Formatas<select value={custom?'custom':`${width}x${height}`} onChange={e=>{if(e.target.value==='custom'){setCustom(true);invalidate()}else{const [w,h]=e.target.value.split('x').map(Number);chooseFormat(w,h)}}}><option value={`${width}x${height}`}>{fmt(width,height)}</option>{activeFormats.filter(([w,h])=>!(w===width&&h===height)).map(([w,h])=><option key={`${w}x${h}`} value={`${w}x${h}`}>{fmt(w,h)}</option>)}<option value="custom">Individualūs matmenys</option></select></label>
-          {custom&&<div className="two"><label className="field">Plotis (cm)<input type="number" min="1" max="300" value={width} onChange={e=>{setWidth(Number(e.target.value));invalidate()}}/></label><label className="field">Aukštis (cm)<input type="number" min="1" max="300" value={height} onChange={e=>{setHeight(Number(e.target.value));invalidate()}}/></label></div>}
-        </section>
-        <section className="panel"><div className="sectionTitle"><Calculator/><div><h3>3. Raiška realiu laiku</h3><p>Formatas nekinta, PPI persiskaičiuoja</p></div></div>
-          <div className="livePpi"><b>{image?cropPpi.toFixed(1):'–'}</b><span>PPI</span></div>
-          <div className="mathGrid"><div><span>Originalas</span><b>{image?`${image.naturalWidth} × ${image.naturalHeight}`:'–'}</b></div><div><span>Apkirpta sritis</span><b>{rect?`${Math.round(rect.sw)} × ${Math.round(rect.sh)} px`:'–'}</b></div><div><span>Galutinis formatas</span><b>{fmt(width,height)} cm</b></div><div><span>Vertinimas</span><b>{image?printGrade(cropPpi,profile):'Laukiama'}</b></div></div>
-          <button className="analyze fullBtn" disabled={!image||width<=0||height<=0} onClick={confirmCrop}><ShieldCheck size={16}/> Patvirtinti apkirpimą</button>
-          {mathConfirmed&&<p className="successLine"><ShieldCheck size={15}/> Apkirpimas patvirtintas</p>}
-        </section>
-      </aside>
-      <section className="mainColumn">
-        <section className="panel editorPanel"><div className="sectionTitle"><Crop/><div><h3>4. Apkirpimas</h3><p>Tempk nuotrauką pele arba pirštu. Spaudos formatas lieka toks pats.</p></div></div>
-          {image&&rect?<><div className="editorStage"><div ref={stageRef} className="cropViewport" style={{aspectRatio:`${width}/${height}`}} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
-              <img src={url} alt="Apkirpimo redaktorius" draggable={false} style={{width:`${(image.naturalWidth/rect.sw)*100}%`,height:`${(image.naturalHeight/rect.sh)*100}%`,left:`-${cropX*(image.naturalWidth-rect.sw)/Math.max(1,rect.sw)}%`,top:`-${cropY*(image.naturalHeight-rect.sh)/Math.max(1,rect.sh)}%`}}/><div className="cropGrid"><i/><i/><i/><i/></div><div className="cropHint"><Move size={14}/> Vilkite vaizdą kadruotei keisti</div>
-            </div></div>
-            <div className="cropTools"><label className="field zoomField"><span><ZoomIn size={15}/> Priartinimas: {zoom.toFixed(1)}×</span><input type="range" min="1" max="4" step="0.05" value={zoom} onChange={e=>{setZoom(Number(e.target.value));invalidate()}}/></label><button className="secondary" onClick={()=>{setZoom(1);setCropX(50);setCropY(50);invalidate()}}>Atstatyti kadrą</button><button className="secondary" onClick={saveCrop} disabled={!cropUrl}><Download size={15}/> Išsaugoti crop</button></div>
-            <p className="hint">Apkirpimas išsaugomas iš originalių pikselių, JPEG kokybe 98 %. Raiška nedidinama dirbtinai ir DPI neprirašomas.</p>
-          </>:<div className="emptyEditor"><ImagePlus size={44}/><b>Įkelk nuotrauką, kad pradėtum apkirpimą</b><span>Pasirink formatą kairėje, tada galėsi laisvai koreguoti kadrą.</span></div>}
-        </section>
-        <section className="panel"><div className="sectionTitle"><Sparkles/><div><h3>5. AI patikrinimas</h3><p>AI analizuoja tik galutinę apkirptą sritį</p></div></div>
-          <label className="toggle"><input type="checkbox" checked={aiEnabled} onChange={e=>{setAiEnabled(e.target.checked);setResult(null);setError('')}}/> Atlikti papildomą AI analizę</label>
-          {aiEnabled&&<><div className="modeList">{modes.map(m=>{const I=m.icon;return <button key={m.id} className={`mode ${mode===m.id?'selected':''}`} onClick={()=>setMode(m.id)}><I size={19}/><span><b>{m.title}</b><small>{m.desc}</small></span><i/></button>})}</div><div className="modelNote"><ShieldCheck size={16}/><span>Modeliai pateikia bendrą kokybės prognozę, bet nepatikimai neidentifikuoja konkrečių defektų vietų.</span></div></>}
-          <div className="actionRow"><span>{status}</span><button className="analyze" disabled={!image||!mathConfirmed||!aiEnabled||busy} onClick={analyse}>{busy?<Loader2 className="spin"/>:<Zap/>}{busy?'Analizuojama...':'Paleisti AI patikrą'}</button></div>
-          {busy&&<><div className="progress"><div style={{width:`${progress}%`}}/></div><small>Modelio paruošimas: {progress}%</small></>}
-          {error&&<div className="alert"><AlertTriangle/><div><b>AI analizė nepavyko</b><p>{error}</p></div></div>}
-          {result&&<div className="result"><div className="resultHead"><div><div className="eyebrow">AI KOKYBĖS PROGNOZĖ</div><h3>{result.model==='HyperIQA'?'HyperIQA modelio išvestis':qualityWord(result.score)}</h3></div><div className="score">{result.model==='HyperIQA'?result.rawScore.toFixed(4):result.score}<small>{result.model==='HyperIQA'?' raw':'/100'}</small></div></div>{result.model!=='HyperIQA'&&<div className="bar"><div style={{width:`${result.score}%`}}/></div>}<div className="resultGrid"><div><span>Modelis</span><b>{result.model}</b></div><div><span>Vykdymas</span><b>{result.provider==='webgpu'?'GPU':'CPU'}</b></div><div><span>Trukmė</span><b>{(result.durationMs/1000).toFixed(1)} s</b></div><div><span>Analizuotas vaizdas</span><b>Apkirpta sritis</b></div></div><p className="hint">HyperIQA reikšmė rodoma neapdorota, nes jos skalė šiame eksportuotame modelyje nėra patikimai patvirtinta kaip 0–1 ar 0–100. Nelygink jos tiesiogiai su kitais modeliais.</p></div>}
-        </section>
+    <div className="layout">
+      <section className="panel uploadPanel"><div className="sectionTitle"><FileImage/><div><h3>1. Nuotrauka</h3><p>Įtempk failą į lauką arba pasirink iš kompiuterio</p></div></div>
+        {!file?<div className="drop" onDragOver={dragOver} onDrop={drop} onClick={()=>inputRef.current?.click()}><input ref={inputRef} type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f)setFile(f)}} hidden/><ImagePlus size={34}/><b>Įkelk nuotrauką čia</b><span>Drag & drop arba paspausk pasirinkimui</span><small>JPG, PNG, WebP. Originalas lieka įrenginyje.</small></div>:<div className="preview"><img src={url} alt="Įkelta nuotrauka"/><div className="fileMeta"><b>{file.name}</b><span>{image?`${image.naturalWidth} × ${image.naturalHeight} px`:'Kraunama...'}</span></div><button className="iconBtn" onClick={clear} title="Pašalinti"><Trash2 size={17}/></button></div>}
+      </section>
+      <section className="panel"><div className="sectionTitle"><Gauge/><div><h3>2. Spaudos tipas ir formatas</h3><p>Įranga parenkama automatiškai</p></div></div>
+        <div className="two"><button className={`mode ${kind==='photo'?'selected':''}`} onClick={()=>{setKind('photo');chooseFormat(20,30)}}><b>Premium nuotrauka</b><small>Noritsu</small></button><button className={`mode ${kind==='wide'?'selected':''}`} onClick={()=>{setKind('wide');chooseFormat(40,60)}}><b>Didelio formato spauda</b><small>Mimaki</small></button></div>
+        <label className="field">Spaudos formatas<select value={custom?'custom':`${width}x${height}`} onChange={e=>{if(e.target.value==='custom'){setCustom(true);setMathConfirmed(false)}else{const [w,h]=e.target.value.split('x').map(Number);chooseFormat(w,h)}}}><option value={`${width}x${height}`}>{fmt(width,height)}</option>{activeFormats.filter(([w,h])=>!(w===width&&h===height)).map(([w,h])=><option key={`${w}x${h}`} value={`${w}x${h}`}>{fmt(w,h)}</option>)}<option value="custom">Individualūs matmenys</option></select></label>
+        {custom&&<div className="two"><label className="field">Plotis (cm)<input type="number" min="1" max="300" value={width} onChange={e=>{setWidth(Number(e.target.value));setMathConfirmed(false);setCropBlob(null)}}/></label><label className="field">Aukštis (cm)<input type="number" min="1" max="300" value={height} onChange={e=>{setHeight(Number(e.target.value));setMathConfirmed(false);setCropBlob(null)}}/></label></div>}
+        <div className="profile"><b>{kind==='photo'?'Noritsu':'Mimaki'}</b><span>{kind==='photo'?'Premium nuotraukų spauda':'Didelio formato spauda'}</span></div>
+      </section>
+      <section className="panel cropPanel"><div className="sectionTitle"><Crop/><div><h3>3. Apkirpimas ir kadruotė</h3><p>Tempk nuotrauką po fiksuotu spaudos formato rėmeliu</p></div></div>
+        {image&&rect?<><div className="cropEditor"><div className="cropStagePro" ref={stageRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}><img className="cropSource" src={url} alt="Nuotraukos kadruotė" draggable={false} style={imageStyle}/><div className="cropShade"/><div className="cropWindow" style={cropFrameStyle}><div className="cropGrid"><i/><i/><i/><i/></div></div><div className="cropHelp">↔ Vilkite nuotrauką kadruotei keisti</div></div></div>
+          <div className="cropTools"><div className="zoomControls"><button className="iconBtn" onClick={()=>setZoomLevel(zoom-.25)} disabled={zoom<=1}><ZoomOut size={16}/></button><input aria-label="Priartinimas" type="range" min="1" max={Math.max(5,Math.min(10000,2/baseCropScale()))} step="0.05" value={Math.min(zoom,Math.max(5,Math.min(10000,2/baseCropScale())))} onChange={e=>setZoomLevel(Number(e.target.value))}/><button className="iconBtn" onClick={()=>setZoomLevel(zoom+.25)} disabled={zoom>=5}><ZoomIn size={16}/></button><b>{rect?`${Math.round(rect.scale*100)}%`:`${zoom.toFixed(2)}×`}</b></div><label className="field zoomSelect">Peržiūros mastelis<select value={zoomPreview} onChange={e=>{setZoomPreview(e.target.value);if(e.target.value==='fit')setZoomLevel(1);else if(e.target.value==='100')setZoomLevel(1/baseCropScale());else if(e.target.value==='200')setZoomLevel(2/baseCropScale())}}><option value="fit">Talpinti</option><option value="100">100 % (tikrieji pikseliai)</option><option value="200">200 % (2× pikseliai)</option></select></label><button className="iconBtn resetCrop" onClick={()=>{setZoom(1);setPan({x:0,y:0});setMathConfirmed(false);setCropBlob(null);setCropUrl('')}}><RotateCcw size={15}/> Atstatyti</button></div>
+          <p className="hint">Rėmelio proporcijos atitinka {fmt(width,height)}. Už rėmelio esanti sritis nebus spausdinama. Priartink vaizdą ir vilk jį, kad pasirinktum tikslią iškarpą.</p>
+        </>:<p className="hint">Pirmiausia įkelk nuotrauką, tada galėsi ją apkirpti.</p>}
+      </section>
+      <section className="panel"><div className="sectionTitle"><Calculator/><div><h3>4. Matematinis įvertinimas</h3><p>Skaičiuojama pagal tikrą apkirptų pikselių kiekį</p></div></div>
+        <div className="mathGrid"><div><span>Apkirptos srities raiška</span><b>{rect?`${Math.round(rect.width)} × ${Math.round(rect.height)} px`:'Laukiama nuotraukos'}</b></div><div><span>Efektyvi spaudos raiška</span><b>{image?`${cropPpi.toFixed(1)} PPI`:'–'}</b></div><div><span>Pasirinktas formatas</span><b>{fmt(width,height)}</b></div><div><span>Raiškos vertinimas</span><b>{image?printGrade(cropPpi,profile):'Laukiama nuotraukos'}</b></div></div>
+        <button className="analyze" disabled={!image||width<=0||height<=0} onClick={confirmCrop}><Crop size={17}/> Patvirtinti apkirpimą</button>
+        {mathConfirmed&&cropBlob&&<div className="successLine"><ShieldCheck size={16}/> Apkirpimas išsaugotas. <button className="downloadBtn" onClick={downloadCrop}><Download size={15}/> Atsisiųsti PNG</button></div>}
+      </section>
+      <section className="panel"><div className="sectionTitle"><Sparkles/><div><h3>5. Papildoma AI analizė</h3><p>AI tikrina patvirtintą apkirptą vaizdą</p></div></div>
+        <label className="toggle"><input type="checkbox" checked={aiEnabled} onChange={e=>{setAiEnabled(e.target.checked);setResult(null);setError('')}}/> Atlikti AI fotografinės kokybės analizę</label>
+        {aiEnabled&&<><div className="modeList">{modes.map(m=>{const I=m.icon;return <button key={m.id} className={`mode ${mode===m.id?'selected':''}`} onClick={()=>setMode(m.id)}><I size={20}/><span><b>{m.title}</b><small>{m.desc}</small></span><i/></button>})}</div><div className="modelNote"><ShieldCheck size={16}/><span>AI analizuoja tik patvirtintą apkirptą nuotrauką. Modelio balas neparodo konkrečių defektų vietų.</span></div></>}
+        <div className="actionRow"><span>{status}</span><button className="analyze" disabled={!cropBlob||!mathConfirmed||!aiEnabled||busy} onClick={analyse}>{busy?<Loader2 className="spin"/>:<Zap/>}{busy?'Analizuojama...':'Paleisti AI analizę'}</button></div>
+        {busy&&<><div className="progress"><div style={{width:`${progress}%`}}/></div><small>Modelio atsisiuntimas / paruošimas: {progress}%</small></>}
+        {error&&<div className="alert"><AlertTriangle/><div><b>AI analizė nepavyko</b><p>{error}</p></div></div>}
+        {result&&<div className="result"><div className="resultHead"><div><div className="eyebrow">AI KOKYBĖS PROGNOZĖ</div><h3>{result.model==='HyperIQA'?'Modelio regresijos rezultatas':qualityWord(result.score)}</h3></div><div className="score">{result.model==='HyperIQA'?result.rawScore.toFixed(4):result.score}<small>{result.model==='HyperIQA'?' raw':'/100'}</small></div></div>{result.model!=='HyperIQA'&&<div className="bar"><div style={{width:`${result.score}%`}}/></div>}<div className="resultGrid"><div><span>Modelis</span><b>{result.model}</b></div><div><span>Vykdymas</span><b>{result.provider==='webgpu'?'GPU':'CPU'}</b></div><div><span>Trukmė</span><b>{(result.durationMs/1000).toFixed(1)} s</b></div></div><p className="hint">{result.model==='HyperIQA'?'HyperIQA grąžina žalią regresijos reikšmę, kurios negalima interpretuoti kaip procentų. ':''}Modelis pateikia bendrą kokybės prognozę, o ne paaiškinamus defektų žemėlapius.</p></div>}
       </section>
     </div>
-    <footer>PHOTO QUALITY AI <span>•</span> VIETINĖ ANALIZĖ <span>•</span> BETA 4.0</footer>
+    <footer>PHOTO QUALITY AI <span>•</span> VIETINĖ ANALIZĖ <span>•</span> BETA 4.1</footer>
   </main>
 }
