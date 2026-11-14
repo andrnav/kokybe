@@ -327,40 +327,6 @@ function calculatePrintRating(dpi, targetDpi, weakTiles) {
   return { score, label, ratio, resolutionScore, sharpnessPenalty };
 }
 
-function calculateSharpnessGrid(image) {
-  const cols = 3, rows = 3, tileW = Math.max(1, Math.floor(image.naturalWidth / cols)), tileH = Math.max(1, Math.floor(image.naturalHeight / rows));
-  const canvas = document.createElement('canvas'); canvas.width = 384; canvas.height = 384;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-  const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const scores = [];
-  for (let gy = 0; gy < rows; gy++) for (let gx = 0; gx < cols; gx++) {
-    const x0 = Math.floor(gx * width / cols), x1 = Math.floor((gx + 1) * width / cols);
-    const y0 = Math.floor(gy * height / rows), y1 = Math.floor((gy + 1) * height / rows);
-    let sum = 0, sum2 = 0, count = 0, edges = 0;
-    for (let y = y0 + 1; y < y1 - 1; y += 2) for (let x = x0 + 1; x < x1 - 1; x += 2) {
-      const at = (y * width + x) * 4;
-      const lum = 0.2126 * data[at] + 0.7152 * data[at + 1] + 0.0722 * data[at + 2];
-      const left = (y * width + x - 1) * 4, right = (y * width + x + 1) * 4;
-      const up = ((y - 1) * width + x) * 4, down = ((y + 1) * width + x) * 4;
-      const l = 0.2126 * data[left] + 0.7152 * data[left + 1] + 0.0722 * data[left + 2];
-      const r = 0.2126 * data[right] + 0.7152 * data[right + 1] + 0.0722 * data[right + 2];
-      const u = 0.2126 * data[up] + 0.7152 * data[up + 1] + 0.0722 * data[up + 2];
-      const d = 0.2126 * data[down] + 0.7152 * data[down + 1] + 0.0722 * data[down + 2];
-      const edge = Math.hypot(r - l, d - u);
-      sum += edge; sum2 += edge * edge; count++; if (edge > 22) edges++;
-    }
-    const mean = count ? sum / count : 0;
-    const variance = count ? Math.max(0, sum2 / count - mean * mean) : 0;
-    scores.push({ x: gx, y: gy, score: Math.sqrt(variance), edgeShare: count ? edges / count : 0 });
-  }
-  const sorted = scores.map(s => s.score).sort((a,b) => a-b);
-  const median = sorted[Math.floor(sorted.length / 2)] || 0;
-  // A tile is flagged only when it is clearly weaker than the image's own median;
-  // this reduces false alarms on naturally smooth skies and plain backgrounds.
-  return scores.map(s => ({ ...s, weak: median > 0 && s.score < median * 0.42 && s.edgeShare < 0.12 }));
-}
-
 function createOrientedCanvas(image, rotation = 0) {
   const turns = ((Math.round(rotation / 90) % 4) + 4) % 4;
   const swap = turns % 2 === 1;
