@@ -75,7 +75,6 @@ export default function App() {
     const maxX=Math.max(0,(image.naturalWidth*s-fw)/2),maxY=Math.max(0,(image.naturalHeight*s-fh)/2)
     return {x:Math.max(-maxX,Math.min(maxX,next.x)),y:Math.max(-maxY,Math.min(maxY,next.y))}
   }
-  function baseCropScale(){if(!image)return 1;const fw=Math.min(stageSize.width*.86,stageSize.height*.86*ratio),fh=fw/ratio;return Math.max(fw/image.naturalWidth,fh/image.naturalHeight)}
   function setZoomLevel(z:number){const nz=Math.max(1,Math.min(10000,z));setZoom(nz);setPan(p=>clampPan(p,nz));setMathConfirmed(false);setCropBlob(null);setCropUrl('')}
   function onPointerDown(e:React.PointerEvent){if(!image)return;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);dragRef.current={x:e.clientX,y:e.clientY,panX:pan.x,panY:pan.y}}
   function onPointerMove(e:React.PointerEvent){const bounds=stageRef.current?.getBoundingClientRect();if(bounds)setPointer({x:e.clientX-bounds.left,y:e.clientY-bounds.top,visible:true});if(!dragRef.current)return;const d=dragRef.current;setPan(clampPan({x:d.panX+e.clientX-d.x,y:d.panY+e.clientY-d.y}));setMathConfirmed(false);setCropBlob(null);setCropUrl('')}
