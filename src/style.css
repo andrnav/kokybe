@@ -68,3 +68,21 @@
 .secondaryBtn{display:flex;align-items:center;gap:6px;border:1px solid #40525a;background:#1b2b33;color:#dce8e8;border-radius:9px;padding:9px 11px;cursor:pointer}
 @media(max-width:900px){.batchSettings{grid-template-columns:repeat(2,minmax(0,1fr))}.batchContent{grid-template-columns:1fr}.batchDetail{order:-1}}
 @media(max-width:600px){.appTabs{width:100%}.appTabs button{flex:1;justify-content:center;padding:10px 6px;font-size:12px}.batchHeader,.batchGalleryHead{align-items:flex-start;flex-direction:column}.batchSettings{grid-template-columns:1fr}.batchActions{width:100%}}
+
+/* 4.5: individual per-image batch crop controls */
+.batchEditorLayout{display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,420px);gap:16px;align-items:start}
+.batchEditor{position:sticky;top:12px;background:#142128;border:1px solid #2d4149;border-radius:13px;padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.batchEditorTitle{display:flex;flex-direction:column;gap:4px;overflow-wrap:anywhere}
+.batchEditorTitle span{font-size:11px;color:#aab8bf}
+.batchPreview{width:100%;max-height:310px;min-height:180px;background:#080e12;border:1px solid #3b5059;border-radius:9px;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.batchPreview img{width:100%;height:100%;max-height:310px;object-fit:cover;transition:transform .08s linear}
+.batchControls{display:flex;flex-direction:column;gap:11px;max-height:62vh;overflow:auto;padding-right:3px}
+.batchControls .field{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#d9e5e6}
+.batchControls input[type=range]{width:100%;accent-color:#6bc6a4}
+.batchControls input,.batchControls select,.batchOutput select{min-width:0}
+.exactFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.batchInfo{font-size:11px;line-height:1.5;color:#a9d9c8;background:#19332d;padding:9px;border-radius:8px;margin:0}
+.batchOutput{display:flex;flex-direction:column;gap:4px;font-size:11px;color:#cbd8da}
+.batchOutput select{background:#17252c;color:#eef5f4;border:1px solid #3a5058;border-radius:8px;padding:9px}
+@media(max-width:1050px){.batchEditorLayout{grid-template-columns:1fr}.batchEditor{position:static}.batchControls{max-height:none}.batchPreview{max-width:680px;margin:0 auto}}
+@media(max-width:600px){.exactFields{grid-template-columns:1fr}.batchActions{align-items:stretch}.batchActions>*{flex:1}}

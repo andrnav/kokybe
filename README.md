@@ -38,3 +38,16 @@ Svarbūs techniniai apribojimai:
 - RAW formatai sąmoningai nepalaikomi.
 - HEIC dekodavimui reikalinga `heic2any` biblioteka ir pirmą kartą gali reikėti interneto ryšio priklausomybių įdiegimui.
 - Partijų apkirpimas taiko vienodą centrinį kadravimą pasirinktai proporcijai. Individualus kiekvienos nuotraukos kadro pastūmimas dar nėra įtrauktas.
+
+## 4.5 – Individualus partijų kadravimas
+
+Partijų apdorojime kiekvienai nuotraukai atskirai galima nustatyti:
+- Foto popieriaus formatą: 9×13, 13×9, 10×15, 15×10, 15×15, 20×30 arba 30×20 cm.
+- Kadravimo būdą:
+  - **Pagal proporciją** – apkerpama pagal pasirinkto popieriaus formato proporciją, išlaikant originalius pikselius ir nenaudojant dirbtinio DPI didinimo.
+  - **Tikslus formatas + DPI** – įvedamas plotis, aukštis centimetrais ir DPI; eksportuojamas tiksliai apskaičiuotas pikselių dydis.
+  - **Įtalpinti su baltais kraštais** – visas originalus vaizdas išsaugomas, laisva vieta užpildoma balta spalva.
+- Individualus priartinimas, horizontalus/vertikalus pastūmimas ir kopijų skaičius.
+- Kiekvienos nuotraukos nustatymai išsaugomi atskirai iki partijos eksporto.
+
+Pastaba: naršyklės peržiūra yra orientacinė. Galutinis kadravimas ir eksportas atliekamas pagal nustatytą formato santykį, priartinimą ir pastūmimą. Tikslus režimas gali didinti arba mažinti pikselių skaičių iki įvesto DPI matmenų; tai nekeičia pradinės detalės kiekio, jei šaltinio raiškos nepakanka.
