@@ -1,6 +1,6 @@
 import type React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap, Crop, Calculator, Sparkles, Download, RotateCcw, Layers, Check } from 'lucide-react'
+import { Activity, AlertTriangle, Cpu, FileImage, Gauge, ImagePlus, Loader2, ScanEye, ShieldCheck, Trash2, Zap, Crop, Calculator, Sparkles, Download, RotateCcw, Layers } from 'lucide-react'
 import type { Mode, Profile } from './analysis'
 import { printGrade, qualityWord, runIqa } from './analysis'
 
@@ -135,7 +135,7 @@ function BatchProcessor(){
     {!items.length?<button className="batchEmpty" onClick={()=>input.current?.click()}><ImagePlus size={36}/><b>Įkelk nuotraukas</b><span>JPG, PNG, HEIC, GIF, WebP, BMP ir TIFF</span></button>:<div className="printboxWorkspace">
       <main className="printboxGallery">
         <div className="printboxGalleryHead"><div><b>Nuotraukos</b><span>{items.length} failai · pasirink nuotrauką koregavimui</span></div><button className="secondaryBtn" onClick={()=>input.current?.click()}><ImagePlus size={15}/> Pridėti nuotraukų</button></div>
-        <div className="printboxCards">{items.map((item,index)=><article key={item.id} className={`printboxPhotoCard ${selected===item.id?'isSelected':''} ${item.status==='done'?'isDone':''}`} onClick={()=>setSelected(item.id)}>
+        <div className="printboxCards">{items.map(item=><article key={item.id} className={`printboxPhotoCard ${selected===item.id?'isSelected':''} ${item.status==='done'?'isDone':''}`} onClick={()=>setSelected(item.id)}>
           <div className="printboxCardTop"><b>{item.file.name}</b><button onClick={e=>{e.stopPropagation();setSelected(item.id)}}>{selected===item.id?'Pasirinkta':'Pasirinkti'}</button></div>
           <div className="printboxCardImage" onPointerDown={e=>{e.stopPropagation();setSelected(item.id);e.currentTarget.setPointerCapture(e.pointerId);drag.current={x:e.clientX,y:e.clientY,panX:item.panX,panY:item.panY}}} onPointerMove={e=>{if(!drag.current||selected!==item.id)return;const r=e.currentTarget.getBoundingClientRect();const dx=(e.clientX-drag.current.x)/Math.max(1,r.width)*180/Math.max(1,item.zoom);const dy=(e.clientY-drag.current.y)/Math.max(1,r.height)*180/Math.max(1,item.zoom);update(item.id,{panX:Math.max(-100,Math.min(100,drag.current.panX+dx)),panY:Math.max(-100,Math.min(100,drag.current.panY+dy))})}} onPointerUp={()=>{drag.current=null}}>
             <img src={item.previewUrl} alt="" draggable={false} onLoad={e=>{const el=e.currentTarget;if(item.naturalWidth!==el.naturalWidth||item.naturalHeight!==el.naturalHeight)update(item.id,{naturalWidth:el.naturalWidth,naturalHeight:el.naturalHeight})}} style={{objectFit:item.mode==='fit'?'contain':'cover',objectPosition:'center',transform:`translate(${-item.panX/2}%,${-item.panY/2}%) scale(${item.zoom})`}}/>
