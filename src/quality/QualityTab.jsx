@@ -101,8 +101,8 @@ export default function QualityTab({ photos, thumbs, getPrint, quality, activeId
             <div className="q-res">
               <ul className="q-why">{q.reasons.map((r, k) => <li key={k} className={r.tone}>{r.text}</li>)}</ul>
               <div className={`q-adv ${q.cls}`}>{q.advice}</div>
-              {a.metrics && <details className="q-detail">
-                <summary>Detali analizė: ką rado sistema</summary>
+              {a.metrics && <details className="q-detail" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+                <summary onClick={e => e.stopPropagation()}>Detali analizė: ką rado sistema</summary>
                 <div className="q-detail-grid">
                   <div><b>Ryškumas</b><span>{a.metrics.sharp == null ? 'Nepakanka detalių matavimui' : `${Math.round(a.metrics.sharp)} balų · ${a.metrics.sharp < 25 ? 'galimai išplaukusi' : a.metrics.sharp < 80 ? 'silpnas detalumas' : 'pakankamas detalumo signalas'}`}</span></div>
                   <div><b>Triukšmas</b><span>{a.metrics.noise == null ? 'Neįvertinta' : `σ ${a.metrics.noise.toFixed(2)} · ${a.metrics.noise < 2.5 ? 'mažas' : a.metrics.noise < 4.5 ? 'vidutinis' : 'didelis'}`}</span></div>
