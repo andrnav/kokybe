@@ -89,7 +89,7 @@ export default function QualityTab({ photos, thumbs, getPrint, quality, activeId
             <div className="q-id">
               <div className="q-name" title={p.name}>{p.name}</div>
               <div className="q-sub">
-                {print.sourceWidthPx ?? print.widthPx} × {print.sourceHeightPx ?? print.heightPx} px · {print.free ? 'laisvas kadras · DPI nenustatytas' : `${print.wCm} × ${print.hCm} cm · ${Math.round(print.dpiX)} × ${Math.round(print.dpiY)} DPI`}
+                {print.widthPx} × {print.heightPx} px · {print.free ? 'laisvas kadras · DPI nenustatytas' : `${print.wCm} × ${print.hCm} cm · ${Math.round(Math.min(print.dpiX, print.dpiY))} DPI`}
               </div>
               <span className={`q-badge ${q.cls}`}>{q.label}</span>
             </div>
@@ -124,7 +124,7 @@ export default function QualityTab({ photos, thumbs, getPrint, quality, activeId
           </label>)}
         </div>
         <button className="secondary" onClick={resetConfig}>Atstatyti numatytuosius</button>
-        <p className="q-note">Šie nustatymai skirti tik šiam skirsniui. Kadravimo įrankių juostoje rodomas kokybės indikatorius naudoja atskirą skalę iš krumpliaračio nustatymų.</p>
+        <p className="q-note">Tie patys nustatymai naudojami ir kadravimo skiltyje, ir čia. DPI bei kokybės įvertinimas abiejose vietose visada sutampa.</p>
       </details>
 
       <details className="q-box">

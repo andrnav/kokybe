@@ -119,3 +119,11 @@ Skirsnis „Nuotraukos kokybė“ nebėra išjungtas. Jame kiekviena nuotrauka v
 - Prie kiekvienos nuotraukos rodomas faktinis DPI pagal pasirinktą spaudos formatą.
 - Neberodomas nereikalingas „Kadravimas“ režimo tekstas.
 - Laisvo formato atveju DPI nerodomas, nes nėra pasirinkto fizinio spaudos dydžio.
+
+
+## v2.1.4 – vieningas kokybės vertinimas
+
+- Kadravimo įrankių juosta ir „Nuotraukos kokybė“ naudoja tą pačią `quality/engine.js` vertinimo funkciją ir tuos pačius išsaugomus nustatymus.
+- Pašalinta atskira sena DPI tikslų lentelė iš krumpliaračio nustatymų, kuri galėjo rodyti kitokį įvertinimą. Krumpliaračio mygtukas atidaro „Nuotraukos kokybė“ skiltį, kur yra vieninteliai vertinimo nustatymai.
+- DPI rodomas vienu skaičiumi: naudojama mažesnė iš horizontalios ir vertikalios DPI reikšmių, t. y. konservatyvesnė spaudos raiška.
+- Kokybės skiltyje prie kiekvienos nuotraukos taip pat rodomas vienas DPI skaičius.

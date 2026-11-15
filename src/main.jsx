@@ -7,6 +7,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import * as UTIF from 'utif';
 import QualityTab from './quality/QualityTab.jsx';
 import { useQuality } from './quality/useQuality.js';
+import { evaluate } from './quality/engine.js';
 import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2 } from 'lucide-react';
 import './style.css';
 
@@ -27,25 +28,6 @@ const FORMATS = [
   { id: 'a3', label: 'A3', ratioLabel: '29,7 × 42 cm', cm: [29.7, 42] },
   { id: '30x45', label: '30 × 45 cm', ratioLabel: '30,5 × 45 cm', cm: [30.5, 45] },
 ];
-const DEFAULT_QUALITY_SCALE = [
-  { id: '10x15', label: '10 × 15 cm', size: 15, dpi: 200 },
-  { id: '20x30', label: '20 × 30 cm', size: 30, dpi: 180 },
-  { id: '30x40', label: '30 × 40 cm', size: 40, dpi: 160 },
-  { id: '40x60', label: '40 × 60 cm', size: 60, dpi: 140 },
-  { id: '60x90', label: '60 × 90 cm', size: 90, dpi: 120 },
-  { id: '120x90', label: '120 × 90 cm', size: 120, dpi: 100 },
-  { id: '150x100', label: '150 × 100 cm', size: 150, dpi: 90 },
-];
-const getTargetDpi = (longSideCm, scale) => {
-  const rows = [...scale].sort((a, b) => a.size - b.size);
-  if (longSideCm <= rows[0].size) return rows[0].dpi;
-  if (longSideCm >= rows[rows.length - 1].size) return rows[rows.length - 1].dpi;
-  for (let i = 0; i < rows.length - 1; i++) {
-    const l = rows[i], r = rows[i + 1];
-    if (longSideCm >= l.size && longSideCm <= r.size) return l.dpi + (r.dpi - l.dpi) * ((longSideCm - l.size) / (r.size - l.size));
-  }
-  return rows[0].dpi;
-};
 const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
 const round1 = n => Math.round(n * 10) / 10;
@@ -276,8 +258,6 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [dropZone, setDropZone] = useState('');
   const [message, setMessage] = useState('');
-  const [qualityScale, setQualityScale] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('foto-inspektorius-quality-scale')); return Array.isArray(saved) && saved.length ? saved : DEFAULT_QUALITY_SCALE; } catch { return DEFAULT_QUALITY_SCALE; } });
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
   const [resizeStart, setResizeStart] = useState(null);
@@ -295,7 +275,6 @@ function App() {
     if (active) { setZoom(active.zoom ?? 1); setPan(active.pan || { x: 0, y: 0 }); setMode(active.mode || 'crop'); setFormat(active.format || format); setCustomCm(active.customCm || customCm); }
   }, [activeId]);
   useEffect(() => () => photos.forEach(p => URL.revokeObjectURL(p.url)), []);
-  useEffect(() => { localStorage.setItem('foto-inspektorius-quality-scale', JSON.stringify(qualityScale)); }, [qualityScale]);
   useEffect(() => {
     const node = stageRef.current;
     if (!node) return;
@@ -478,10 +457,9 @@ function App() {
     const { widthPx, heightPx } = print;
     if (print.free) return { widthPx, heightPx, size: 'Laisvas formatas', dpi: '—', quality: 'Nevertinama', qualityClass: 'neutral', targetDpi: null };
     const { wCm, hCm, dpiX, dpiY } = print;
-    const targetDpi = getTargetDpi(Math.max(wCm, hCm), qualityScale), ratio = Math.min(dpiX, dpiY) / targetDpi;
-    const quality = ratio >= 1 ? 'Puiki' : ratio >= .85 ? 'Gera' : ratio >= .65 ? 'Ribinė' : 'Prasta';
-    const qualityClass = ratio >= 1 ? 'good' : ratio >= .85 ? 'fair' : ratio >= .65 ? 'warning' : 'bad';
-    return { widthPx, heightPx, size: `${wCm} × ${hCm} cm`, dpi: `${Math.round(dpiX)} × ${Math.round(dpiY)} DPI`, quality, qualityClass, targetDpi: Math.round(targetDpi) };
+    const result = evaluate({ dpi: Math.min(dpiX, dpiY), cmW: wCm, cmH: hCm, metrics: quality.analysis[active.id]?.metrics, ai: quality.analysis[active.id]?.ai }, quality.cfg);
+    const qualityClass = result.level >= 4 ? 'good' : result.level === 3 ? 'warning' : 'bad';
+    return { widthPx, heightPx, size: `${wCm} × ${hCm} cm`, dpi: `${Math.round(Math.min(dpiX, dpiY))} DPI`, quality: result.label, qualityClass, targetDpi: Math.round(result.reqGood) };
   })() : null;
 
   const renderStage = () => {
@@ -557,7 +535,7 @@ function App() {
 
   const currentFormatId = active?.format || format;
   return <div className="app-shell">
-    <header className="topbar"><div className="brand"><div className="brand-icon"><Camera size={21}/></div><span>Foto inspektorius</span></div><nav className="tabs"><button className={tab === 'crop' ? 'tab active' : 'tab'} onClick={() => setTab('crop')}><Crop size={17}/> Kadravimas</button><button className={tab === 'quality' ? 'tab active' : 'tab'} onClick={() => setTab('quality')}><Images size={17}/> Nuotraukos kokybė</button></nav><div className="top-actions"><span className="batch-count">{photos.length ? `Nuotraukų partija · ${photos.length} fail.` : 'Nauja nuotraukų partija'}</span><button className="icon-button" title="Kokybės nustatymai" onClick={() => setSettingsOpen(true)}><Settings2 size={19}/></button><button className="download-button" onClick={exportAll} disabled={!photos.length || busy}><Download size={17}/> Atsisiųsti viską <span className="zip-pill">ZIP</span></button></div></header>
+    <header className="topbar"><div className="brand"><div className="brand-icon"><Camera size={21}/></div><span>Foto inspektorius</span></div><nav className="tabs"><button className={tab === 'crop' ? 'tab active' : 'tab'} onClick={() => setTab('crop')}><Crop size={17}/> Kadravimas</button><button className={tab === 'quality' ? 'tab active' : 'tab'} onClick={() => setTab('quality')}><Images size={17}/> Nuotraukos kokybė</button></nav><div className="top-actions"><span className="batch-count">{photos.length ? `Nuotraukų partija · ${photos.length} fail.` : 'Nauja nuotraukų partija'}</span><button className="icon-button" title="Kokybės vertinimo nustatymai" onClick={() => setTab('quality')}><Settings2 size={19}/></button><button className="download-button" onClick={exportAll} disabled={!photos.length || busy}><Download size={17}/> Atsisiųsti viską <span className="zip-pill">ZIP</span></button></div></header>
     <main className="workspace" style={tab === 'crop' ? undefined : { display: 'none' }}>
       <aside className="left-panel"><div className="panel-title">1. Spausdinimo formatas</div><div className="select-wrap format-select"><select value={currentFormatId} disabled={selectedMode === 'free'} onChange={e => changeFormat(e.target.value)}>{FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}<option value="custom">Pagal skaičius</option></select></div>
         <div className="custom-format"><div className="custom-format-title">Rankinis formatas</div><div className="custom-format-fields"><input disabled={selectedMode === "free"} aria-label="Pirmas matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[0]} onChange={e => changeCustom(0, e.target.value)}/><span>×</span><input disabled={selectedMode === "free"} aria-label="Antras matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[1]} onChange={e => changeCustom(1, e.target.value)}/></div></div>
@@ -572,16 +550,6 @@ function App() {
       onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
       onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDropZone(''); }}
       onDrop={e => handleDrop(e, 'strip')}><div className="strip-head"><div><b>Nuotraukų eilė</b><span>{photos.length} nuotraukos</span></div><div className="strip-tools"><button onClick={() => fileRef.current?.click()}><ImagePlus size={16}/> Pridėti</button><button onClick={() => { photos.forEach(p => URL.revokeObjectURL(p.url)); setPhotos([]); setActiveId(null); }}>Išvalyti partiją</button></div></div><div className="strip-body"><button className="strip-arrow" onClick={() => stripRef.current?.scrollBy({ left: -240, behavior: 'smooth' })}><ChevronLeft/></button><div className="thumb-list" ref={stripRef} onWheel={e => { if (stripRef.current) { e.preventDefault(); stripRef.current.scrollLeft += Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX; } }}>{photos.map((p, i) => <div key={p.id} className={`thumb-card ${p.id === activeId ? 'active' : ''}`}><button className="thumb-select" onClick={() => navigateTo(p.id)}><div className={`thumb-image status-${p.status}`}><img src={thumbSources.get(p.id) || p.url} /></div><span className="thumb-label">{p.name}</span></button><div className="thumb-copies"><button aria-label={`Mažinti ${p.name} kopijų skaičių`} onClick={() => updatePhoto(p.id, { copies: Math.max(1, (p.copies || 1) - 1) })} disabled={(p.copies || 1) <= 1}>−</button><b>{p.copies || 1}</b><button aria-label={`Didinti ${p.name} kopijų skaičių`} onClick={() => updatePhoto(p.id, { copies: Math.min(99, (p.copies || 1) + 1) })}>＋</button><button className="thumb-delete" title="Pašalinti nuotrauką" aria-label={`Pašalinti ${p.name}`} onClick={() => deletePhoto(p.id)}><Trash2 size={14}/></button></div></div>)}</div><button className="strip-arrow" onClick={() => stripRef.current?.scrollBy({ left: 240, behavior: 'smooth' })}><ChevronRight/></button></div><div className="strip-bottom"><div className="strip-message">{busy ? <><Loader2 className="spin" size={14}/>{message}</> : message}</div></div></section>
-    {settingsOpen && <div className="settings-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setSettingsOpen(false); }}>
-      <section className="quality-settings" role="dialog" aria-modal="true" aria-label="Kokybės nustatymai">
-        <div className="settings-heading"><div><b>Spausdinimo kokybės skalė</b><small>Keiskite tikslinę raišką pagal fizinį spaudinio dydį</small></div><button onClick={() => setSettingsOpen(false)}>✕</button></div>
-        <div className="quality-table"><div className="quality-table-head"><span>Formatas</span><span>Ilgoji kraštinė (cm)</span><span>Tikslas (DPI)</span></div>
-          {qualityScale.map((row, index) => <div className="quality-table-row" key={row.id || index}><span>{row.label}</span><input type="number" min="1" max="500" value={row.size} onChange={e => setQualityScale(prev => prev.map((r,i) => i === index ? {...r,size: clamp(Number(e.target.value)||1,1,500)} : r))}/><input type="number" min="30" max="600" value={row.dpi} onChange={e => setQualityScale(prev => prev.map((r,i) => i === index ? {...r,dpi: clamp(Number(e.target.value)||30,30,600)} : r))}/></div>)}
-        </div>
-        <div className="settings-note">Tarp dydžių tikslinė raiška apskaičiuojama tiesine interpoliacija. Vertinimui naudojama mažesnė horizontalios ir vertikalios efektyvios raiškos reikšmė.</div>
-        <div className="settings-actions"><button className="secondary" onClick={() => setQualityScale(DEFAULT_QUALITY_SCALE)}>Atkurti pradines reikšmes</button><button className="primary" onClick={() => setSettingsOpen(false)}>Išsaugoti</button></div>
-      </section>
-    </div>}
     <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.gif,.heic,.heif,.tif,.tiff,.pdf,application/pdf,image/*" multiple hidden onChange={e => { addFiles(e.target.files); e.target.value = ''; }}/>
   </div>;
 }
