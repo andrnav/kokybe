@@ -142,3 +142,9 @@ Skirsnis „Nuotraukos kokybė“ nebėra išjungtas. Jame kiekviena nuotrauka v
 - JPG JFIF metaduomenyse įrašomas pasirinktas DPI.
 - Kiti kadravimo režimai nepakeisti.
 - Pašalintas fiksuotas „320 DPI“ užrašas iš „Real Size“ mygtuko.
+
+
+## v2.1.8
+- Pridėtas atskirų apdorotų JPG nuotraukų išsaugojimas į naudotojo pasirinktą aplanką (Chrome / Edge, HTTPS arba localhost).
+- Eksportas sukuria datuotą poaplankį ir rodo apdorojimo progresą.
+- ZIP eksportas paliktas nepakeistas.

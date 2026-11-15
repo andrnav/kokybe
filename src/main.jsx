@@ -8,7 +8,7 @@ import * as UTIF from 'utif';
 import QualityTab from './quality/QualityTab.jsx';
 import { useQuality } from './quality/useQuality.js';
 import { evaluate } from './quality/engine.js';
-import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2, FolderDown } from 'lucide-react';
+import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2, FolderOpen } from 'lucide-react';
 import './style.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -259,8 +259,6 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [dropZone, setDropZone] = useState('');
   const [message, setMessage] = useState('');
-  const [sourceFolderName, setSourceFolderName] = useState('');
-  const sourceFolderRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
   const [resizeStart, setResizeStart] = useState(null);
@@ -434,85 +432,76 @@ function App() {
     return { name: prefix + photo.name.replace(/\.[^.]+$/, '') + '.' + extension, blob };
   };
   const downloadBlob = (blob, name) => { const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000); };
-  const getExportStamp = () => {
-    const now = new Date();
-    return `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
-  };
   const exportAll = async () => {
     if (!photos.length || busy) return;
     setBusy(true); setMessage(`Ruošiami ${exportFormat.toUpperCase()} failai…`);
     try {
       const zip = new JSZip();
       for (let i = 0; i < photos.length; i++) { const result = await exportOne(photos[i]); zip.file(result.name, result.blob); setMessage(`Apdorojama ${i + 1} / ${photos.length}`); }
-      downloadBlob(await zip.generateAsync({ type: 'blob' }), `${getExportStamp()}.zip`);
+      downloadBlob(await zip.generateAsync({ type: 'blob' }), `${makeExportStamp()}.zip`);
       setPhotos(prev => prev.map(p => ({ ...p, status: 'done' })));
       setMessage('ZIP archyvas paruoštas.');
-    } catch (e) { console.error(e); setMessage(`Eksportuojant įvyko klaida: ${e.message || 'nežinoma klaida'}`); }
+    } catch (e) { console.error(e); setMessage('Eksportuojant įvyko klaida.'); }
     setBusy(false);
   };
-  const chooseSourceFolder = async () => {
+  const makeExportStamp = () => {
+    const now = new Date();
+    return `${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+  };
+  const saveAllToFolder = async () => {
+    if (!photos.length || busy) return;
     if (!('showDirectoryPicker' in window)) {
-      setMessage('Ši naršyklė nepalaiko tiesioginio aplanko pasirinkimo. Naudokite naujausią Chrome arba Edge.');
+      setMessage('Ši naršyklė nepalaiko tiesioginio išsaugojimo į pasirinktą aplanką. Naudokite naujausią Chrome arba Edge.');
       return;
     }
+    let parentHandle;
     try {
-      const folder = await window.showDirectoryPicker({ mode: 'readwrite' });
-      sourceFolderRef.current = folder;
-      setSourceFolderName(folder.name);
-      const files = [];
-      for await (const entry of folder.values()) {
-        if (entry.kind !== 'file' || !/\.(jpe?g|png|webp|bmp|gif|heic|heif|tif|tiff|pdf)$/i.test(entry.name)) continue;
-        files.push(await entry.getFile());
-      }
-      if (!files.length) { setMessage('Pasirinktame aplanke nerasta palaikomų nuotraukų.'); return; }
-      await addFiles(files);
+      // Aplanko pasirinkimas pradedamas tiesiogiai iš mygtuko paspaudimo.
+      parentHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
     } catch (e) {
-      if (e?.name !== 'AbortError') setMessage(`Nepavyko atverti aplanko: ${e.message || 'prieiga atmesta'}`);
+      if (e?.name === 'AbortError') return;
+      console.error(e);
+      setMessage('Nepavyko pasirinkti aplanko.');
+      return;
     }
-  };
-  const saveAllToSourceFolder = async () => {
-    const folder = sourceFolderRef.current;
-    if (!folder) { await chooseSourceFolder(); return; }
-    if (!photos.length || busy) return;
-    setBusy(true); setMessage('Ruošiami failai išsaugojimui į pasirinktą aplanką…');
+    setBusy(true);
     try {
-      const stamp = getExportStamp();
-      let outputFolderName = stamp;
-      let suffix = 2;
+      const stamp = makeExportStamp();
+      let folderName = stamp;
+      let suffix = 1;
       while (true) {
         try {
-          await folder.getDirectoryHandle(outputFolderName);
-          outputFolderName = `${stamp} (${suffix++})`;
+          await parentHandle.getDirectoryHandle(folderName);
+          folderName = `${stamp} (${suffix++})`;
         } catch (e) {
           if (e?.name === 'NotFoundError') break;
           throw e;
         }
       }
-      const outputFolder = await folder.getDirectoryHandle(outputFolderName, { create: true });
+      const outputHandle = await parentHandle.getDirectoryHandle(folderName, { create: true });
+      setMessage(`Kuriamas aplankas „${folderName}“…`);
       const usedNames = new Set();
       for (let i = 0; i < photos.length; i++) {
         const result = await exportOne(photos[i], 'jpg');
-        let filename = result.name;
-        if (usedNames.has(filename)) {
-          const dot = filename.lastIndexOf('.');
-          const base = dot >= 0 ? filename.slice(0, dot) : filename;
-          const ext = dot >= 0 ? filename.slice(dot) : '';
-          let n = 2;
-          while (usedNames.has(`${base} (${n})${ext}`)) n++;
-          filename = `${base} (${n})${ext}`;
+        const dot = result.name.lastIndexOf('.');
+        const base = result.name.slice(0, dot);
+        let fileName = result.name;
+        let duplicate = 1;
+        while (usedNames.has(fileName.toLocaleLowerCase())) {
+          fileName = `${base} (${duplicate++}).jpg`;
         }
-        usedNames.add(filename);
-        const fileHandle = await outputFolder.getFileHandle(filename, { create: true });
+        usedNames.add(fileName.toLocaleLowerCase());
+        const fileHandle = await outputHandle.getFileHandle(fileName, { create: true });
         const writable = await fileHandle.createWritable();
         await writable.write(result.blob);
         await writable.close();
         setMessage(`Išsaugoma ${i + 1} / ${photos.length}`);
       }
       setPhotos(prev => prev.map(p => ({ ...p, status: 'done' })));
-      setMessage(`Išsaugota aplanke „${outputFolderName}“ (${photos.length} fail.). Originalai nepakeisti.`);
+      setMessage(`Išsaugota ${photos.length} JPG nuotraukų aplanke „${folderName}“.`);
     } catch (e) {
       console.error(e);
-      setMessage(`Nepavyko išsaugoti į aplanką: ${e.message || 'nežinoma klaida'}`);
+      setMessage(`Išsaugant nuotraukas įvyko klaida: ${e?.message || 'nežinoma klaida'}`);
     } finally {
       setBusy(false);
     }
@@ -632,7 +621,7 @@ function App() {
 
   const currentFormatId = active?.format || format;
   return <div className="app-shell">
-    <header className="topbar"><div className="brand"><div className="brand-icon"><Camera size={21}/></div><span>Foto inspektorius</span></div><nav className="tabs"><button className={tab === 'crop' ? 'tab active' : 'tab'} onClick={() => setTab('crop')}><Crop size={17}/> Kadravimas</button><button className={tab === 'quality' ? 'tab active' : 'tab'} onClick={() => setTab('quality')}><Images size={17}/> Nuotraukos kokybė</button></nav><div className="top-actions"><span className="batch-count">{photos.length ? `Nuotraukų partija · ${photos.length} fail.` : 'Nauja nuotraukų partija'}</span><button className="icon-button" title="Kokybės vertinimo nustatymai" onClick={() => setTab('quality')}><Settings2 size={19}/></button><button className="download-button" onClick={exportAll} disabled={!photos.length || busy}><Download size={17}/> Atsisiųsti viską <span className="zip-pill">ZIP</span></button><button className="location-button" onClick={saveAllToSourceFolder} disabled={busy} title={sourceFolderName ? `Išsaugoti į pradinį aplanką: ${sourceFolderName}` : 'Pasirinkti užsakymo aplanką ir įkelti nuotraukas'}><FolderDown size={17}/><span>{sourceFolderName ? 'Išsaugoti' : 'Pasirinkti'}<small>į lokaciją</small></span></button></div></header>
+    <header className="topbar"><div className="brand"><div className="brand-icon"><Camera size={21}/></div><span>Foto inspektorius</span></div><nav className="tabs"><button className={tab === 'crop' ? 'tab active' : 'tab'} onClick={() => setTab('crop')}><Crop size={17}/> Kadravimas</button><button className={tab === 'quality' ? 'tab active' : 'tab'} onClick={() => setTab('quality')}><Images size={17}/> Nuotraukos kokybė</button></nav><div className="top-actions"><span className="batch-count">{photos.length ? `Nuotraukų partija · ${photos.length} fail.` : 'Nauja nuotraukų partija'}</span><button className="icon-button" title="Kokybės vertinimo nustatymai" onClick={() => setTab('quality')}><Settings2 size={19}/></button><button className="download-button folder-save-button" onClick={saveAllToFolder} disabled={!photos.length || busy}><FolderOpen size={17}/> Išsaugoti nuotraukas</button><button className="download-button" onClick={exportAll} disabled={!photos.length || busy}><Download size={17}/> Atsisiųsti viską <span className="zip-pill">ZIP</span></button></div></header>
     <main className="workspace" style={tab === 'crop' ? undefined : { display: 'none' }}>
       <aside className="left-panel"><div className="panel-title">1. Spausdinimo formatas</div><div className="select-wrap format-select"><select value={currentFormatId} disabled={selectedMode === 'free'} onChange={e => changeFormat(e.target.value)}>{FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}<option value="custom">Pagal skaičius</option></select></div>
         <div className="custom-format"><div className="custom-format-title">Rankinis formatas</div><div className="custom-format-fields"><input disabled={selectedMode === "free"} aria-label="Pirmas matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[0]} onChange={e => changeCustom(0, e.target.value)}/><span>×</span><input disabled={selectedMode === "free"} aria-label="Antras matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[1]} onChange={e => changeCustom(1, e.target.value)}/></div></div>
