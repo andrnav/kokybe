@@ -1,88 +1,98 @@
-# Foto inspektorius v1.5
+# Foto inspektorius 2.1.0
 
-## Paleidimas vietoje
+Atnaujintas „Nuotraukos kokybė“ puslapis. Jis skirtas vienai nuotraukai įkelti, konkrečiam spaudos formatui pasirinkti, kadrui pele pastumti, pasukti ir priartinti, o tada analizuoti tiksliai tą patį apkirptą vaizdą.
 
+## Kadravimas ir analizė
+- Nuotrauka apkerpama pagal pasirinktą spaudos formato proporciją.
+- Peržiūros kadras ir AI modeliams perduodamas vaizdas generuojami iš tos pačios apkirpimo geometrijos.
+- Galima stumdyti nuotrauką pele arba pirštu, pasukti 90° žingsniais, keisti priartinimą ir atkurti pradinę nuotraukos padėtį.
+- Pakeitus „Foto spauda“ / „Platiaformatė spauda“ tipą, formatas grąžinamas į atitinkamą numatytą dydį, todėl ankstesnis 100 × 150 cm pasirinkimas nebeturi likti aktyvus foto spaudos režime.
+
+## Kaip skaičiuojamas 1–10 spaudos balas
+Tai matematinis raiškos tinkamumo įvertinimas, o ne AI modelių vidurkis:
+1. Iš galutinio apkirpimo nustatomas plotis ir aukštis pikseliais.
+2. Kiekviena kraštinė padalijama iš atitinkamo spaudos dydžio coliais (cm / 2,54). Taip gaunamas DPI.
+3. Mažesnis iš dviejų DPI skaičių lyginamas su rekomenduojamu DPI, kuris nustatomas pagal spaudos kraštinės dydį ir kokybės nustatymų lentelę.
+4. Santykis paverčiamas į 1–10 balą: ≥150% = 10; ≥125% = 9; ≥110% = 8; ≥100% = 7; ≥90% = 6; ≥80% = 5; ≥70% = 4; ≥60% = 3; ≥45% = 2; mažiau = 1.
+
+Todėl pasirinkus kitą AI modelį ar jų skaičių DPI balas nesikeičia. Tai sąmoninga: modelių išvestys turi skirtingas, tarpusavyje nesuderintas skales. Jų neapdoroti rezultatai rodomi atskirai. Modeliai vertina suvokiamą vaizdo kokybę, o DPI skaičiavimas vertina, ar turimos detalės pakanka nurodytam fiziniam spaudos dydžiui.
+
+## Paleidimas
 ```bash
 npm install
 npm run dev
 ```
 
-## GitHub Pages
-
-Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe/` iš `test` branch per GitHub Actions. Saugyklos `Settings → Pages → Build and deployment → Source` turi būti pasirinkta `GitHub Actions`.
-
-## v1.5 pakeitimai
-
-- „Balti kraštai“ pervadinti į „Įtalpinta“. Įtalpinimo režime galima priartinti ir pastumti nuotrauką, kad sumažėtų balti šonai; tai veikia ir pagrindinėje peržiūroje, ir eksporte.
-- Spausdinimo formatas pasirenkamas iš išskleidžiamo sąrašo; rankiniai matmenys automatiškai perjungia formatą į „Pagal skaičius“.
-- Pašalintas dešinysis informacijos skydelis ir didinimo mygtukas, todėl pagrindinė peržiūra platesnė.
-- „Atsisiųsti šią nuotrauką“ perkeltas šalia „Atstatyti“.
-- Apatinė nuotraukų juosta slenkama pelės ratuku horizontaliai.
-- Prie failo pavadinimo pridėtas kopijų skaičius. Kai skaičius didesnis nei 1, eksportuojamo failo pavadinimas prasideda, pvz., „2x - “.
-
-## v1.2 pakeitimai
-
-- „Balti kraštai“ pagrindiniame peržiūros lange rodomi tikrame pasirinkto formato baltame lape.
-- Balto lapo proporcija apskaičiuojama iš pasirinktų centimetrų, o nuotrauka įtalpinama nekeičiant jos proporcijų.
-- Kadravimo peržiūroje nuotrauka rodoma tik pasirinkto formato rėmelio viduje; išorė pritemdoma.
-- Pridėtas rankinis formato įvedimas centimetrais. Pakeitus bent vieną matmenį, formatas tampa „Pagal skaičius“.
-- Pašalintas „Patvirtinti“ mygtukas. Pereinant prie kitos nuotraukos, ankstesnė pažymima kaip peržiūrėta; eksportuojant pažymima visa partija.
-- Paliktas „Atstatyti“ mygtukas, kuris grąžina automatinę orientaciją, mastelį ir centrinį kadravimą.
-- Apatinės miniatiūros rodo būsimą eksportuojamą vaizdą, įskaitant baltus kraštus.
-- Originalūs įkelti failai nekeičiami.
-
-## Pastaba
-
-Šioje aplinkoje nepavyko įdiegti npm priklausomybių per skirtą laiką, todėl `npm run build` dar nebuvo patikrintas. GitHub Actions atliks build publikavimo metu ir parodys konkrečią klaidą, jei jos liko.
-\n\n## v1.5\n- Fixed fitted-mode thumbnails so the actual photo and white margins render together.\n- Crop and Real Size previews now show the full source image; the area outside the print crop is dimmed.\n
-
-## v1.5
-- App renamed to Foto inspektorius.
-- Removed the original-file note and the thumbnail status legend.
-- Added left/right keyboard navigation.
-- Added JPG and lossless 8-bit TIFF export.
-- Added live crop pixel, print-size, and DPI readouts.
-- Added unconstrained Free crop mode and Apply to all photos for the selected crop mode.
+Modeliai veikia naršyklėje per ONNX Runtime Web ir pirmą kartą atsisiunčiami iš modelių saugyklos. Tolimesnis veikimas priklauso nuo naršyklės cache nustatymų.
 
 
-## v1.7
-- Preview positioning now derives directly from the same source-pixel crop rectangle used by export.
-- Added print-size-aware resolution grading (editable DPI/PPI targets).
-- Added quality threshold settings with browser persistence and JSON import/export.
-- Added quality status beside pixel dimensions and effective resolution.
+## v2.1.1 pataisymai
+- Spaudos kadro peržiūra išlaiko tikrą formato proporciją ir nebėra tempiama per visą plotį.
+- Centrinė peržiūra apribota pagal ekrano aukštį ir plotį.
+- AI modelių rezultatai rodomi aiškiai atskirai; žinomos DBCNN, HyperIQA, MUSIQ ir CLIPIQA skalės orientaciškai perskaičiuojamos į 1–10.
+- MANIQA skaitinė skalė neperverčiama, nes šio modelio kortelėje nepateikta patikima riba.
 
 
-## v1.7 – crop/export synchronization and quality scoring
-
-- Crop preview now derives image placement from the exact source-pixel crop rectangle used by the export canvas.
-- Dragging the photo right moves the displayed photo right; the exported crop corresponds to the visible crop window.
-- Added a visible print-quality rating beside pixel dimensions and DPI.
-- Added editable quality thresholds in the settings dialog. Values are saved in browser local storage.
-- Quality thresholds are interpolated by the print's longest side. The rating uses the lower of horizontal and vertical effective source DPI.
-- Real Size output remains 320 DPI, while its quality rating uses the original source crop resolution before upscaling.
+## v2.2.0 – nuotraukos kokybės santrauka
+Po analizės pateikiama viena aiški apkirpto kadro santrauka: spaudos tinkamumas, tikslus DPI, ryškumo ir susiliejimo rizikos indikatorius, triukšmo indikatorius, ekspozicija, AI modelių bendras signalas ir galutinė rekomendacija. DPI skaičiuojamas pagal apkirpto vaizdo pikselius ir pasirinktą fizinį spaudos dydį. Ryškumo, triukšmo ir ekspozicijos reikšmės yra automatiniai vaizdo signalų įverčiai, ne laboratoriniai matavimai.
 
 
-## v1.8 – laisvas kadravimas ir nuotraukų eilės patobulinimai
-
-- „Laisvas“ režimas naudoja nepriklausomą apkirpimo stačiakampį, kuris pradžioje apima visą originalią nuotrauką.
-- Laisvo kadro proporcija nepririšta prie spausdinimo formato. Stačiakampį galima keisti tempiant jo apatinį dešinį kampą, o nuotrauką – stumdyti kadro viduje.
-- Spausdinimo formato pasirinkimas ir rankiniai matmenys išjungiami „Laisvas“ režime. Kiti režimai vėl naudoja pasirinktą formatą.
-- Pikseliai, DPI ir kokybės įvertinimas perkeltas šalia failo pavadinimo.
-- Kopijų kiekio valdiklis perkeltas į kiekvienos nuotraukos kortelę apačioje, po miniatiūra ir failo pavadinimu.
+## v2.3.1 – build pataisymas ir sąsajos supaprastinimas
+- Atkurta pilna pagrindinio JSX komponento struktūra, kuri v2.3.0 archyve buvo netyčia nukirsta.
+- AI modelių pasirinkimo sąrašas pašalintas iš pagrindinės šoninės juostos; naudojami numatytieji analizės modeliai.
+- Priartinimo valdikliai perkelti ant nuotraukos, palaikomas pelės ratukas.
+- AI techniniai rezultatai paslėpti nuo pagrindinio naudotojo vaizdo; palikta kokybės santrauka.
 
 
-## v1.9 – HEIC/HEIF ir PDF palaikymas
+## v2.4.0 – matematinė nuotraukos analizė
+- Pašalintas ONNX Runtime AI modelių vykdymas ir modelių pasirinkimas.
+- Analizuojamas tik galutinis apkirptas kadras.
+- Kadras dalijamas į 8 × 8 (64) diagnostines zonas.
+- Naudojami Laplacian Variance, Tenengrad/Sobel kraštų stiprumas, triukšmo indikatorius, ekspozicijos ir 8 px blokų ribų indikatoriai.
+- Žalios, raudonos ir neutralios zonos rodomos ant nuotraukos; jas galima įjungti arba išjungti.
+- FFT atskiras matavimas šiame leidime dar neįgyvendintas ir nėra pristatomas kaip atliktas.
+- Rodiklių ribos yra pradinės heuristikos. Reikia patikrinti su ryškių, išplaukusių, triukšmingų ir lygių sričių pavyzdžiais.
 
-- HEIC ir HEIF failai konvertuojami į PNG naršyklėje; jei konverteris nepavyksta, bandomas naršyklės vietinis dekodavimas.
-- Įkeliant PDF kiekvienas puslapis atskirai atvaizduojamas į PNG (3× PDF puslapio masteliu) ir įtraukiamas į bendrą nuotraukų eilę.
-- PDF puslapių failų pavadinimai gauna puslapio numerį, pvz. `Dokumentas - 001.png`.
-- Originalus HEIC/HEIF arba PDF failas nekeičiamas. Eksportuojamos tik apdorotos nuotraukų kopijos.
-- Nepavykus įkelti failo, pranešime parodomas konkretus failo pavadinimas ir klaidos priežastis.
+
+## v2.4.2 pataisymas
+- Atkurta trūkstama `Sparkles` piktogramos importo deklaracija, dėl kurios naršyklėje įvykdavo `ReferenceError` ir puslapis likdavo tuščias.
 
 
-## v1.9.1 – HEIC dekoderio atnaujinimas
+## v2.5.0 – „Kadruoklis“ vertinimo logikos perkėlimas
+- Perkelta spaudos vertinimo logika: žiūrėjimo atstumas, Noritsu/Mimaki profiliai, efektyvios raiškos korekcija pagal ryškumą, Immerkaer triukšmo įvertis, ekspozicijos histogramų statistika ir 5 kokybės lygiai.
+- Analizuojamas galutinis apkirptas kadras, o ne pradinis originalas.
+- Vertinimo ribas galima keisti rezultatų skiltyje; jos saugomos naršyklėje.
+- Claude projekto `ai.js` neperkeltas: jis naudoja bendrą CLIP zero-shot modelį ir tekstines poras, ne atskirai išmokytą CLIP-IQA modelį.
+- Perkelti skaitiniai slenksčiai yra pradinės heuristikos. Juos būtina kalibruoti su realiais spaudos pavyzdžiais.
 
-- Pašalinta pasenusi `heic2any` biblioteka (0.0.4), kuri naudojo senesnį libheif ir atmesdavo dalį naujesnių HEIC kodavimo variantų.
-- Naudojama `heic-to` 1.6.7, paremta naujesniu libheif 1.23.7.
-- HEIC/HEIF konvertuojamas į PNG naršyklėje. PDF apdorojimo kodas nepakeistas.
-- Jei HEIC nepavyksta perskaityti, klaidos pranešime atskirai pateikiama dekoderio ir naršyklės klaida.
+
+## v2.5.1 – Claude „Kadruoklis“ CLIP modelio integracija
+- Įdėtas tas pats `Xenova/clip-vit-base-patch16` modelis iš pateikto `kadruoklis/ai.js`, per Transformers.js 3.8.1, Q8 ir WASM.
+- Išsaugotos Claude projekto penkios tekstų poros: bendras kokybės, ryškumo, švaros/triukšmo, šviesumo ir kontrasto vertinimas.
+- AI veikia tik paspaudus mygtuką, po to, kai atlikta matematinė apkirpto kadro analizė.
+- CLIP vertina centrinį viso kadro fragmentą ir iki keturių matematiškai atrinktų detalių fragmentų.
+- AI rezultatas rodomas atskiroje santraukos eilutėje ir gali sumažinti bendrą 1–5 spaudos įvertinimą pagal Claude projekto `aiBad` ribą (numatyta 0,30).
+- Modelis atsisiunčiamas pirmą kartą iš Hugging Face per Transformers.js; reikalingas internetas. Vaizdo pikseliai apdorojami lokaliai naršyklėje, į serverį nesiunčiami.
+- Svarbu: tai tas pats bendras CLIP ViT modelis ir tekstinių porų metodas iš Claude projekto, o ne atskirai IQA duomenimis išmokytas CLIP-IQA modelis. Jo procentai yra modelio panašumo į tekstinius aprašymus tikimybės tipo balai, ne kalibruota objektyvi nuotraukos kokybės tikimybė.
+
+
+## v2.5.4 – vieninga analizės ataskaita
+- Pašalintas atskiras rezultatų blokas šoninėje juostoje. Visi skaičiavimai pateikiami vienoje detalioje ataskaitoje po nuotraukos peržiūra.
+- Pašalintas žalias / raudonas zonų žymėjimas ant nuotraukos.
+- Pašalinti atskiri DPI ir raiškos rezultatų blokai; jų duomenys perkelti į vieną ataskaitą.
+- Pagrindinis veiksmas pervadintas į „Tikrinti nuotrauką“.
+- Jei CLIP modelis jau įkeltas, pagrindinis tikrinimo veiksmas paleidžia ir matematinę, ir CLIP analizę.
+- CLIP rezultatai pateikiami po nuotrauka aiškia kalba: bendra kokybė, ryškumas, triukšmas, šviesumas ir kontrastas. Procentai paaiškinami kaip teksto ir vaizdo panašumo balai, o ne objektyvios kokybės tikimybė.
+
+
+## v2.5.5 – build klaidos pataisymas
+- Pašalintas netyčia įterptas antras programos šaltinio fragmentas, kuris sukėlė `Expected ";" but found "React"` klaidą.
+- Atkurta viena pilna `src/main.jsx` importų ir programos struktūra.
+
+
+## v2.5.6 – JSX sintaksės pataisymas
+- CLIP išvados bloko `className` išraiška perrašyta be įdėtinio šabloninio teksto, kad JSX parseris neklystų dėl kabučių.
+
+
+## v2.5.7 – JSX klasės išraiškos pataisymas
+- „Kadruoklis“ vertinimo priežasčių sąraše dinaminė CSS klasė perrašyta į paprastą string konkatenaciją.
