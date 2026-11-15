@@ -419,31 +419,17 @@ function App() {
     if (!photo.cutLine || canvas.width < 2 || canvas.height < 2) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
+    // The exported canvas is the final crop frame. In FIT mode it is the
+    // complete paper/frame (including white margins), not the photo rectangle.
+    // Paint exact one-pixel edges rather than a centred stroke, which can be
+    // clipped or appear thicker/softer at the canvas boundary.
     ctx.save();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1;
-    if (photo.mode === 'fit') {
-      const target = getTargetRatio(photo);
-      const sheetW = Math.max(photo.width, Math.ceil(photo.height * target));
-      const sheetH = Math.max(photo.height, Math.ceil(photo.width / target));
-      const fitScale = Math.min(sheetW / photo.width, sheetH / photo.height);
-      const z = clamp(Number(photo.zoom || 1), 1, 4);
-      const drawW = photo.width * fitScale * z;
-      const drawH = photo.height * fitScale * z;
-      const maxX = Math.max(0, (drawW - sheetW) / 2);
-      const maxY = Math.max(0, (drawH - sheetH) / 2);
-      const px = clamp(Number(photo.pan?.x || 0), -1, 1) * maxX;
-      const py = clamp(Number(photo.pan?.y || 0), -1, 1) * maxY;
-      const x = (sheetW - drawW) / 2 + px;
-      const y = (sheetH - drawH) / 2 + py;
-      // The canvas clips the outline naturally if the zoomed image reaches
-      // beyond the sheet edge.
-      ctx.strokeRect(Math.round(x) + 0.5, Math.round(y) + 0.5,
-        Math.max(0, Math.round(drawW) - 1), Math.max(0, Math.round(drawH) - 1));
-    } else {
-      // Crop/real/free outputs contain only the final image area.
-      ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
-    }
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, canvas.width, 1);
+    ctx.fillRect(0, canvas.height - 1, canvas.width, 1);
+    ctx.fillRect(0, 0, 1, canvas.height);
+    ctx.fillRect(canvas.width - 1, 0, 1, canvas.height);
     ctx.restore();
   };
 
