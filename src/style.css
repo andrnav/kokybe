@@ -214,21 +214,15 @@
 @media(max-width:900px){.q-ai-score-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .real-dpi-picker{display:flex;align-items:center;gap:4px;margin-left:10px;padding:3px 4px;border:1px solid #394555;border-radius:8px;background:#111720;flex:none}.real-dpi-picker span{font-size:10px;color:#9eabba;padding:0 5px}.real-dpi-picker button{border:0;border-radius:5px;background:transparent;color:#aeb9c8;padding:5px 9px;font-size:11px;font-weight:650}.real-dpi-picker button.active{background:#24466d;color:#9bcaff;box-shadow:inset 0 0 0 1px #347fc9}
 
-.export-cutline-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 34px;
-  padding: 0 10px;
-  border: 1px solid #3b4655;
-  border-radius: 8px;
-  background: #222a36;
-  color: #d0d9e5;
-  font-size: 11px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.export-cutline-toggle input {
-  accent-color: #78aee8;
-  margin: 0;
-}
+
+
+/* v2.1.13: cut-line switch shown only in Real Size toolbar */
+.cutline-switch{display:inline-flex;align-items:center;gap:7px;min-height:28px;padding:3px 9px;border:1px solid transparent;border-radius:8px;font-size:10px;font-weight:650;white-space:nowrap;transition:background .16s,border-color .16s,color .16s;cursor:pointer}
+.cutline-switch.is-off{background:#49242d;border-color:#8b3948;color:#ffb5c0;box-shadow:0 0 10px #e34c6426}
+.cutline-switch.is-on{background:#173e31;border-color:#318c68;color:#9ce8c3;box-shadow:0 0 11px #35c98730}
+.cutline-switch:disabled{opacity:.45;cursor:not-allowed}
+.cutline-switch-track{width:27px;height:15px;display:inline-flex;align-items:center;padding:2px;border-radius:99px;background:#9b4655;transition:background .16s}
+.cutline-switch-track span{width:11px;height:11px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0005;transform:translateX(0);transition:transform .16s}
+.cutline-switch.is-on .cutline-switch-track{background:#29966b}
+.cutline-switch.is-on .cutline-switch-track span{transform:translateX(12px)}
+@media(max-width:760px){.cutline-switch{margin-left:0}}
