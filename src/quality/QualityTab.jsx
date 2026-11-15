@@ -89,7 +89,7 @@ export default function QualityTab({ photos, thumbs, getPrint, quality, activeId
             <div className="q-id">
               <div className="q-name" title={p.name}>{p.name}</div>
               <div className="q-sub">
-                {p.width}×{p.height} px · {print.free ? 'laisvas kadras' : `${print.wCm}×${print.hCm} cm · ${MODE_LABEL[print.mode] || print.mode}`}
+                {print.sourceWidthPx ?? print.widthPx} × {print.sourceHeightPx ?? print.heightPx} px · {print.free ? 'laisvas kadras · DPI nenustatytas' : `${print.wCm} × ${print.hCm} cm · ${Math.round(print.dpiX)} × ${Math.round(print.dpiY)} DPI`}
               </div>
               <span className={`q-badge ${q.cls}`}>{q.label}</span>
             </div>

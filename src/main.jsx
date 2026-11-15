@@ -191,8 +191,10 @@ function getCrop(photo) {
 function getPhotoPrint(photo) {
   const mode = photo.mode || 'crop';
   const crop = getCrop(photo);
-  let widthPx = Math.max(1, Math.round(crop.sw)), heightPx = Math.max(1, Math.round(crop.sh));
-  if (mode === 'free') return { free: true, mode, widthPx, heightPx };
+  const sourceWidthPx = Math.max(1, Math.round(crop.sw));
+  const sourceHeightPx = Math.max(1, Math.round(crop.sh));
+  let widthPx = sourceWidthPx, heightPx = sourceHeightPx;
+  if (mode === 'free') return { free: true, mode, widthPx, heightPx, sourceWidthPx, sourceHeightPx };
   const [a, b] = getFormat(photo).cm;
   const portrait = getOrientation(photo);
   const wCm = portrait ? a : b, hCm = portrait ? b : a;
@@ -210,7 +212,7 @@ function getPhotoPrint(photo) {
   } else {
     dpiX = widthPx / (wCm / 2.54); dpiY = heightPx / (hCm / 2.54);
   }
-  return { free: false, mode, wCm, hCm, widthPx, heightPx, dpiX, dpiY, effDpi: Math.min(dpiX, dpiY) };
+  return { free: false, mode, wCm, hCm, widthPx, heightPx, sourceWidthPx, sourceHeightPx, dpiX, dpiY, effDpi: Math.min(dpiX, dpiY) };
 }
 function renderPhoto(photo, canvas, { thumbnail = false } = {}) {
   const fmt = getFormat(photo);

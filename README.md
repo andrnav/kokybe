@@ -113,3 +113,9 @@ Skirsnis „Nuotraukos kokybė“ nebėra išjungtas. Jame kiekviena nuotrauka v
 - Matematinės išvados pateikiamos žmonėms suprantamais įvertinimais: Puiki, Gera, Tinka, Ribinė, Prasta.
 - „AI antra nuomonė“ pervadinta į „AI patikra“.
 - AI rezultatai rodomi atskirai kaip 1–5 įvertinimai: aštrumas, vaizdo švara, ekspozicija, kontrastas ir bendra kokybė. 1–5 skalė yra sąsajos interpretacija, perskaičiuota iš CLIP-IQA porinių tikimybių, o ne modelio gamyklinis balas.
+
+## v2.1.3
+- Nuotraukų kokybės sąraše vietoje originalaus failo matmenų rodomi tikrieji šaltinio pikseliai po pasirinkto kadravimo ir priartinimo.
+- Prie kiekvienos nuotraukos rodomas faktinis DPI pagal pasirinktą spaudos formatą.
+- Neberodomas nereikalingas „Kadravimas“ režimo tekstas.
+- Laisvo formato atveju DPI nerodomas, nes nėra pasirinkto fizinio spaudos dydžio.
