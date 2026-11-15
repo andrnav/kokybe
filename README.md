@@ -103,3 +103,23 @@ Skirsnis „Nuotraukos kokybė“ nebėra išjungtas. Jame kiekviena nuotrauka v
 - Kadravimo įrankių juostoje esantis „Kokybė“ indikatorius ir jo skalė (krumpliaračio nustatymai) nekeisti, todėl kraštutiniais atvejais jo ir naujojo skirsnio vertinimai gali skirtis.
 - Kai skirsnis „Nuotraukos kokybė“ atidarytas, rodyklės ←/→ nekeičia aktyvios nuotraukos.
 - Nauji failai: `src/quality/` (`engine.js`, `analyze.js`, `ai.js`, `useQuality.js`, `QualityTab.jsx`). Naujų npm priklausomybių nėra.
+
+
+## v2.7.0 – išplėstinė nuotraukų kokybės diagnostika
+
+Kokybės analizė dabar skaičiuojama pagal konkrečios nuotraukos pasirinktą kadrą (zoom/pan/orientaciją ir formatą), o ne visą originalų vaizdą. Pakeitus kadrą, ankstesnis analizės rezultatas laikomas pasenusiu ir analizė atliekama iš naujo.
+
+Papildomi diagnostiniai rodikliai:
+- ryškumo zonų žemėlapis (žalia / geltona / raudona pagal Laplaso detalumo signalą);
+- 2–98 procentilių tonų diapazonas kontrasto orientaciniam įvertinimui;
+- beveik juodų ir beveik baltų pikselių dalis;
+- RGB kanalų kraštinių reikšmių diagnostika;
+- kryptinio suliejimo požymių indikatorius pagal gradientų struktūrą;
+- JPEG kvantavimo lentelių vidurkis, kai originalus failas yra JPEG;
+- blokų artefaktų indikatorius;
+- galimo dirbtinio padidinimo / interpoliuotų pikselių požymių heuristika;
+- apytikslis spalvų triukšmo ir spalvų poslinkio indikatorius.
+
+Svarbu: padidinimo, JPEG blokų, kryptinio suliejimo ir spalvų triukšmo rodikliai yra heuristikos, ne patikimas originalios raiškos ar fotografavimo istorijos atkūrimas. Jie rodomi kaip perspėjimai, o ne automatinis broko įrodymas. Naršyklėje iš dekoduoto vaizdo neįmanoma tiksliai atkurti ankstesnių WhatsApp/JPEG suspaudimo kartų. JPEG kvantavimo lentelės prieinamos tik originaliam JPEG failui; PNG, TIFF, PDF ar HEIC atvejais jos gali nebūti.
+
+AI modelių (DBCNN / HyperIQA) šiame etape nepridėjau. Esama CLIP antra nuomonė palikta kaip atskira pasirenkama funkcija.

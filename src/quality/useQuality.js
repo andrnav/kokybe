@@ -27,16 +27,21 @@ export function useQuality(photos) {
   }, []);
 
   const getMetrics = useCallback(async photo => {
+    const signature = JSON.stringify([photo.mode, photo.format, photo.customCm, photo.orientation, photo.zoom, photo.pan, photo.freeCrop]);
     const cached = analysisRef.current[photo.id]?.metrics;
-    if (cached) return cached;
+    if (cached?.cropSignature === signature) return cached;
     const metrics = await analyzePhoto(photo);
+    metrics.cropSignature = signature;
     patchAnalysis(photo.id, { metrics });
     return metrics;
   }, [patchAnalysis]);
 
   const analyzeAll = useCallback(async () => {
     if (busy.current.analyzing) return;
-    const todo = photosRef.current.filter(p => !analysisRef.current[p.id]?.metrics);
+    const todo = photosRef.current.filter(p => {
+      const m = analysisRef.current[p.id]?.metrics;
+      return !m || m.cropSignature !== JSON.stringify([p.mode, p.format, p.customCm, p.orientation, p.zoom, p.pan, p.freeCrop]);
+    });
     if (!todo.length) { setJob({ analyzing: false, text: 'Visos nuotraukos jau išanalizuotos.' }); return; }
     busy.current.analyzing = true;
     try {

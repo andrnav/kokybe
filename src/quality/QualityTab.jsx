@@ -27,7 +27,6 @@ const getP = (o, p) => p.reduce((a, k) => a[k], o);
 
 export default function QualityTab({ photos, thumbs, getPrint, quality, activeId, onOpen, appMessage }) {
   const { cfg, analysis, job, ai, analyzeAll, loadAi, runAi, stopAi, updateConfig, resetConfig } = quality;
-  const [onlyBad, setOnlyBad] = useState(false);
 
   const rows = useMemo(() => photos.map((p, i) => {
     const a = analysis[p.id] || {};
@@ -42,7 +41,7 @@ export default function QualityTab({ photos, thumbs, getPrint, quality, activeId
   rows.forEach(r => { if (r.q.free) counts.free++; else counts[r.q.level]++; });
   const analyzed = photos.filter(p => analysis[p.id]?.metrics).length;
   const aiDone = photos.filter(p => analysis[p.id]?.ai).length;
-  const shown = onlyBad ? rows.filter(r => !r.q.free && r.q.level <= 2) : rows;
+  const shown = rows;
   const problems = counts[1] + counts[2];
   const activeExists = photos.some(p => p.id === activeId);
 
@@ -50,12 +49,11 @@ export default function QualityTab({ photos, thumbs, getPrint, quality, activeId
     <div className="quality-inner">
       <div className="q-head">
         <div className="q-ctx">
-          Kiekviena nuotrauka vertinama pagal <b>jos pasirinktą formatą ir kadravimo tipą</b> (keičiama skirsnyje „Kadravimas“).
+          Kiekviena nuotrauka analizuojama pagal jos apkirptą kadrą ir pasirinktą spaudos formatą.
           Spausdintuvas parenkamas automatiškai: iki {fmt1(cfg.maxMinilabCm)} cm pločio – {cfg.printers.noritsu.name.split(' (')[0]}, didesniems – {cfg.printers.mimaki.name.split(' (')[0]}.
         </div>
         <div className="q-actions">
           <button className="primary" onClick={analyzeAll} disabled={!photos.length || job.analyzing}>Analizuoti nuotraukas</button>
-          <label className="q-only"><input type="checkbox" checked={onlyBad} onChange={e => setOnlyBad(e.target.checked)} /> tik problemines</label>
           <span className="q-status">{job.text}</span>
         </div>
       </div>
@@ -71,7 +69,7 @@ export default function QualityTab({ photos, thumbs, getPrint, quality, activeId
       <div className="q-ai">
         <div className="q-ai-head"><b>AI antra nuomonė</b> <span className="muted">(neprivaloma, veikia jūsų naršyklėje, be raktų ir be paskyros)</span></div>
         <p className="muted">
-          Atsisiunčiamas nedidelis CLIP modelis (apie 150 MB, vienkartinis), kuris jūsų kompiuterio procesoriumi įvertina ryškumą, triukšmą ir bendrą kokybę.
+          CLIP yra tik papildoma nuomonė. Pagrindinę ataskaitą sudaro matematiniai matavimai.
           Nuotraukos niekur nesiunčiamos. Tai papildoma nuomonė po matematinės analizės, o ne vietoj jos.
         </p>
         <div className="q-ai-actions">
@@ -88,7 +86,6 @@ export default function QualityTab({ photos, thumbs, getPrint, quality, activeId
 
       <div className="q-list">
         {!photos.length && <div className="q-empty">Nuotraukų dar nėra. Įkelkite jas skirsnyje „Kadravimas“.</div>}
-        {photos.length > 0 && !shown.length && <div className="q-empty">Problemų nerasta.</div>}
         {shown.map(({ p, i, a, print, q }) => (
           <div key={p.id} className={`q-row ${p.id === activeId ? 'current' : ''}`} role="button" tabIndex={0}
             title="Atidaryti kadravimo skirsnyje" onClick={() => onOpen(p.id)}
@@ -104,6 +101,23 @@ export default function QualityTab({ photos, thumbs, getPrint, quality, activeId
             <div className="q-res">
               <ul className="q-why">{q.reasons.map((r, k) => <li key={k} className={r.tone}>{r.text}</li>)}</ul>
               <div className={`q-adv ${q.cls}`}>{q.advice}</div>
+              {a.metrics && <details className="q-detail">
+                <summary>Detali analizė: ką rado sistema</summary>
+                <div className="q-detail-grid">
+                  <div><b>Ryškumas</b><span>{a.metrics.sharp == null ? 'Nepakanka detalių matavimui' : `${Math.round(a.metrics.sharp)} balų · ${a.metrics.sharp < 25 ? 'galimai išplaukusi' : a.metrics.sharp < 80 ? 'silpnas detalumas' : 'pakankamas detalumo signalas'}`}</span></div>
+                  <div><b>Triukšmas</b><span>{a.metrics.noise == null ? 'Neįvertinta' : `σ ${a.metrics.noise.toFixed(2)} · ${a.metrics.noise < 2.5 ? 'mažas' : a.metrics.noise < 4.5 ? 'vidutinis' : 'didelis'}`}</span></div>
+                  <div><b>Kontrastas</b><span>{a.metrics.histogram?.contrastRange ?? '—'} (2–98 % tonų skirtumas)</span></div>
+                  <div><b>Šviesios vietos</b><span>{(a.metrics.histogram?.brightPct ?? 0).toFixed(1)} % beveik baltų pikselių</span></div>
+                  <div><b>Tamsios vietos</b><span>{(a.metrics.histogram?.darkPct ?? 0).toFixed(1)} % beveik juodų pikselių</span></div>
+                  <div><b>Galimas padidinimas</b><span>{a.metrics.upscale?.likely ? 'Aptikta požymių' : 'Aiškių požymių nerasta'} · tai tik įtarimas</span></div>
+                  <div><b>JPEG suspaudimas</b><span>{a.metrics.jpeg?.avgQuantization == null ? 'JPEG lentelės nepasiekiamos' : `Kvantavimo vidurkis ${a.metrics.jpeg.avgQuantization.toFixed(1)}`}</span></div>
+                  <div><b>Spalvų triukšmo požymiai</b><span>{a.metrics.advanced?.chromaNoiseProxy?.toFixed(1) ?? '—'} (apytikslis indikatorius)</span></div>
+                  <div><b>Galimas kryptinis suliejimas</b><span>{a.metrics.advanced?.possibleDirectionalBlur ? 'Yra požymių' : 'Aiškių požymių nerasta'}</span></div>
+                  <div><b>Spalvų balanso indikatoriai</b><span>a*: {a.metrics.advanced?.colorCast?.redGreen?.toFixed(1) ?? '—'} · b*: {a.metrics.advanced?.colorCast?.greenBlue?.toFixed(1) ?? '—'} (ne spalvų tikslumo matas)</span></div>
+                </div>
+                {a.metrics.heatmap && <div className="q-heat"><b>Ryškumo žemėlapis</b><img src={a.metrics.heatmap} alt="Ryškumo analizės žemėlapis" /><small>Žalia – stipresnis detalių signalas; geltona – silpnesnis; raudona – labai silpnas. Tai ne automatinis broko įrodymas.</small></div>}
+                {!!a.metrics.findings?.length && <div className="q-findings">{a.metrics.findings.map((f,k)=><p key={k} className={f.level}>{f.text}</p>)}</div>}
+              </details>}
               {!a.metrics && !print.free && <div className="q-pending">Ryškumas ir triukšmas dar nevertinti – spauskite „Analizuoti nuotraukas“. Kol kas vertinama tik pagal dpi.</div>}
             </div>
           </div>
