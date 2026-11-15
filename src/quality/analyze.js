@@ -184,7 +184,7 @@ export function analyzePhoto(photo, options) {
   let verdict = 'Tinkama spaudai';
   let verdictClass = 'good';
   if (bad) { verdict = 'Prasta spaudos kokybė'; verdictClass = 'bad'; }
-  else if (warnings >= 2 || score < 75) { verdict = 'Rekomenduojama patikrinti'; verdictClass = 'warning'; }
+  else if (warnings >= 2) { verdict = 'Rekomenduojama patikrinti'; verdictClass = 'warning'; }
   else if (warnings === 1) { verdict = 'Tinkama su pastabomis'; verdictClass = 'fair'; }
   return {
     verdict, verdictClass, printer, dpi: Math.round(dpi), targetDpi: Math.round(targetDpi),

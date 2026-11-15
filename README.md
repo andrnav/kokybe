@@ -112,3 +112,7 @@ Matematiniai indikatoriai yra diagnostinės heuristikos, o ne laboratorijoje kal
 
 ### Vietinio AI modelio planuojama integracija
 Naršyklės saugumo apribojimai neleidžia įprastai svetainei savarankiškai įsiminti ir vėliau skaityti bet kurio kompiuterio aplanko kelio. Todėl vietiniam modeliui reikės mažo vietinio Node.js pagalbinio proceso: naudotojas vieną kartą pasirenka modelio failą, kelias įrašomas į vietinį konfigūracijos failą, o aplikacija kreipiasi į `localhost` analizės API. Modelio svoriai liktų kompiuteryje ir nebūtų siunčiami kiekvieną kartą iš naujo. Ši paslauga dar neįdiegta v2.1.0.
+
+
+## 2.1.1 pataisymas
+- Pašalinta neegzistuojančio `score` kintamojo nuoroda, dėl kurios kokybės analizė nutrūkdavo su `score is not defined` klaida.
