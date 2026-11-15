@@ -98,10 +98,19 @@ Po analizės pateikiama viena aiški apkirpto kadro santrauka: spaudos tinkamuma
 - „Kadruoklis“ vertinimo priežasčių sąraše dinaminė CSS klasė perrašyta į paprastą string konkatenaciją.
 
 
-## v2.5.9 – DPI rekomendacijų ir nustatymų suvienodinimas
+## v2.6.0 – DPI rekomendacijų ir nustatymų suvienodinimas
 
 - Nuotraukų kokybės DPI tikslai pritaikyti pagal praktinį spaudinio dydį: 10×15 cm – 250 DPI, 15×21 cm – 220 DPI, 20×30 cm – 190 DPI, 30×40 cm – 160 DPI, 30×45 cm – 150 DPI, 50×50 cm – 150 DPI, 60×90 cm – 120 DPI, 100×150 cm ir 100×200 cm – 100 DPI. Tarp dydžių reikšmės interpoliuojamos.
 - Spaudos įrenginio DPI yra viršutinė riba, o ne automatinis reikalavimas: Noritsu 300 DPI, Mimaki 360 DPI.
 - Žiūrėjimo atstumas rodomas ataskaitoje kaip orientacinis dydis ir skaičiuojamas pagal spaudinio įstrižainę; dideliems spaudiniams nebetaikoma ankstesnė 60 cm riba.
 - DPI skalė, spausdintuvų ribos, žiūrėjimo atstumo parametrai ir matematinės analizės slenksčiai valdomi viename viršutiniame nustatymų lange.
 - Kokybės analizės puslapyje pašalinti atskiri dubliuoti vertinimo nustatymai.
+
+
+## v2.6.0 – suprantama kokybės ataskaita
+
+- Ataskaitos viršuje pateikiamos darbuotojams suprantamos išvados: spaudos detalumas, ryškumas, kontrastas, vaizdo švarumas ir šviesumas.
+- Prie kiekvienos srities pateikiamas aiškus paaiškinimas ir rekomenduojamas veiksmas.
+- Techninių matavimų paaiškinimai paslėpti išskleidžiamoje skiltyje.
+- CLIP AI rezultatas pateikiamas kaip papildoma nuomonė, o ne absoliuti kokybės tikimybė.
+- Kontrasto ribos yra orientacinės, nes skirtingų fotografuojamų scenų natūralus kontrastas skiriasi.

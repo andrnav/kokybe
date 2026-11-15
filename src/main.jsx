@@ -518,6 +518,34 @@ function buildQualitySummary(metrics,visual){
   return {resolution,verdict,detail:visual.textureCoverage<12?'Nepakanka tekstūros patikimam ryškumo įvertinimui':`${visual.goodCount} iš 64 zonų turi stipresnį detalumo signalą; ${visual.weakCount} zonų pažymėtos kaip silpnesnės.`};
 }
 
+function explainQualityForStaff(result) {
+  const v=result.visual, e=result.kadruoklisMetrics?.exposure || {};
+  const evalResult=result.kadruoklisEvaluation;
+  const items=[];
+  const dpi=Math.round(Math.min(result.dpiX,result.dpiY));
+  const target=Math.round(result.targetDpi);
+  const ratio=target ? dpi/target : 0;
+  items.push({title:'Spaudos detalumas',status:ratio>=.9?'good':ratio>=.7?'warn':'bad',text:ratio>=.9?`Pakankamai detali. ${dpi} DPI, rekomenduojama apie ${target} DPI.`:ratio>=.7?`Detalumo gali šiek tiek trūkti žiūrint iš arti. ${dpi} DPI, rekomenduojama apie ${target} DPI.`:`Per maža raiška pasirinktam formatui. Spaudoje gali matytis pikseliai arba trūkti smulkių detalių (${dpi} DPI vietoje ${target} DPI).`});
+  const sharp= result.kadruoklisMetrics?.sharp;
+  const weak=v.weakCount||0;
+  const sharpBad=sharp!=null && sharp<25;
+  const sharpWarn=(sharp!=null && sharp<80) || weak>=10;
+  items.push({title:'Ryškumas',status:sharpBad||weak>=23?'bad':sharpWarn?'warn':'good',text:sharpBad||weak>=23?'Vaizdas gali būti išplaukęs. Daugelyje vietų trūksta aiškių detalių. Patikrinkite fokusą ir originalų failą.':sharpWarn?'Kai kurios nuotraukos vietos atrodo minkštesnės. Padidinkite vaizdą ir patikrinkite svarbiausias detales.':'Ryškumo požymiai geri. Aiškaus viso kadro susiliejimo požymių nerasta.'});
+  const contrast=v.contrast;
+  items.push({title:'Kontrastas',status:contrast<25?'warn':contrast>85?'warn':'good',text:contrast<25?'Vaizdas gana pilkas arba blankus. Tarp šviesių ir tamsių vietų nedidelis skirtumas.':contrast>85?'Kontrastas labai didelis. Gali būti prarandama dalis detalių šešėliuose arba šviesiose vietose.':'Kontrastas atrodo pakankamas. Ryškaus blankumo požymio nėra.'});
+  const noise=result.kadruoklisMetrics?.noise ?? 0;
+  items.push({title:'Vaizdo švarumas',status:noise>=4.5?'bad':noise>=2.5?'warn':'good',text:noise>=4.5?'Matomas stiprus vaizdo grūdėtumas. Didelė tikimybė, kad spaudoje triukšmas bus pastebimas.':noise>=2.5?'Yra šiek tiek grūdėtumo, bet jis nebūtinai trukdys įprastai žiūrint.':'Vaizdas atrodo švarus, ryškaus grūdėtumo požymių nedaug.'});
+  const mean=e.mean ?? 128, clipping=e.bright ?? v.clipping ?? 0;
+  items.push({title:'Šviesumas ir detalės',status:mean<35||mean>220||clipping>=8?'warn':'good',text:mean<35?'Nuotrauka labai tamsi. Tamsiose vietose gali būti sunku įžiūrėti detales.':mean>220?'Nuotrauka labai šviesi. Šviesiose vietose gali būti prarastos detalės.':clipping>=8?'Dalis labai šviesių arba labai tamsių vietų neteko detalių.':'Šviesumas atrodo subalansuotas. Ryškaus peršvietimo ar užtamsinimo požymių nėra.'});
+  if(result.ai){
+    const ai=result.ai;
+    items.push({title:'Papildoma AI nuomonė',status:ai.quality<=.35?'warn':ai.quality>=.65?'good':'neutral',text:ai.quality<=.35?'AI modeliui vaizdas labiau primena prastesnės kokybės nuotrauką. Tai papildomas perspėjimas, ne galutinis verdiktas.':ai.quality>=.65?'AI modeliui vaizdas labiau primena geros kokybės nuotrauką.':'AI negalėjo aiškiai nuspręsti, ar kokybė gera, ar prasta.'});
+  }
+  const problems=items.filter(x=>x.status==='bad'||x.status==='warn');
+  const overall=problems.some(x=>x.status==='bad')?'Reikia patikrinti':problems.length?'Yra pastabų':'Tinka spaudai';
+  return {items,overall,problems};
+}
+
 function calculatePrintRating(dpi, targetDpi, weakTiles) {
   // Spaudos tinkamumo balas remiasi išmatuojama apkirpto kadro raiška.
   // NR-IQA modelių žalių balų nenaudojame, nes jų skalės nėra kalibruotos tarpusavyje.
@@ -1067,14 +1095,18 @@ function App() {
             <span>{qualityResult.ai ? `Ryškumas: ${qualityResult.ai.sharp >= .65 ? 'ryškus' : qualityResult.ai.sharp <= .35 ? 'galimai susiliejęs' : 'neapibrėžtas'} (${Math.round(qualityResult.ai.sharp*100)}%); triukšmas: ${qualityResult.ai.clean >= .65 ? 'nedidelis' : qualityResult.ai.clean <= .35 ? 'ryškus' : 'neapibrėžtas'} (${Math.round(qualityResult.ai.clean*100)}%); šviesumas: ${qualityResult.ai.bright >= .65 ? 'šviesus' : qualityResult.ai.bright <= .35 ? 'tamsus' : 'subalansuotas / neaiškus'}; kontrastas: ${qualityResult.ai.contrast >= .65 ? 'aukštas' : qualityResult.ai.contrast <= .35 ? 'žemas' : 'vidutinis / neaiškus'}. Patikrinta ${qualityResult.ai.n} vaizdo fragmentų.}` : ''}</span>
           </div>
           <div><small>Detalumo / ryškumo signalas</small><b>{qualityResult.visual.sharpness}</b><span>{qualityResult.summary.detail}</span></div>
-          <div><small>Laplacian Variance</small><b>{qualityResult.visual.lapVariance.toLocaleString('lt-LT')}</b><span>Gretimų pikselių šviesumo pokyčių dispersija</span></div>
-          <div><small>Tenengrad</small><b>{qualityResult.visual.tenengrad.toLocaleString('lt-LT')}</b><span>Sobel kraštų stiprumo matas</span></div>
+          <div><small>Smulkių detalių matavimas</small><b>{qualityResult.visual.lapVariance.toLocaleString('lt-LT')}</b><span>Papildomas ryškumo matavimo skaičius</span></div>
+          <div><small>Kraštų aiškumas</small><b>{qualityResult.visual.tenengrad.toLocaleString('lt-LT')}</b><span>Padeda įvertinti, ar kontūrai aiškūs</span></div>
           <div><small>Triukšmo indikatorius</small><b>{qualityResult.visual.noiseLabel}</b><span>Matavimas: {qualityResult.visual.noise}</span></div>
-          <div><small>JPEG blokų indikatorius</small><b>{qualityResult.visual.blockiness}</b><span>Gretimų pikselių skirtumai ties 8 px ribomis</span></div>
+          <div><small>Failo suspaudimo žymės</small><b>{qualityResult.visual.blockiness}</b><span>Gali parodyti matomus kvadratėlius ar suspaudimo artefaktus</span></div>
           <div><small>Silpnos / stiprios zonos</small><b>{qualityResult.visual.weakCount} / {qualityResult.visual.goodCount}</b><span>Iš 64 analizuotų sričių</span></div>
           <div><small>Ekspozicija / kontrastas</small><b>{qualityResult.visual.exposure}</b><span>Kontrastas: {qualityResult.visual.contrast} · išdegimas: {qualityResult.visual.clipping}%</span></div>
         </div>
-        <p className="quality-summary-verdict"><b>Matematinė išvada:</b> {qualityResult.summary.verdict}</p>
+        <section className="staff-quality-guide">
+          <div className="staff-quality-heading"><b>Suprantama išvada darbuotojui</b><strong className={explainQualityForStaff(qualityResult).problems.length ? 'has-notes' : 'is-good'}>{explainQualityForStaff(qualityResult).overall}</strong></div>
+          <div className="staff-quality-grid">{explainQualityForStaff(qualityResult).items.map((item,i)=><article className={`staff-quality-item ${item.status}`} key={i}><b>{item.title}</b><span>{item.text}</span></article>)}</div>
+          <p className="staff-quality-tip">Jei nurodyta problema, pirmiausia peržiūrėkite nuotrauką 100 % masteliu. Matematiniai matavimai padeda rasti riziką, tačiau galutinį sprendimą priimkite pagal patį vaizdą ir bandomąjį spaudinį.</p>
+        </section>
         <section className={"quality-ai-conclusion " + (qualityResult.ai ? "is-ready" : "is-pending")}>
           <div className="quality-ai-conclusion-title"><b>CLIP AI VERTINIMAS</b><span>{qualityResult.ai ? 'ANALIZĖ ATLIKTA' : 'LAUKIA ANALIZĖS'}</span></div>
           {qualityResult.ai ? <>
@@ -1090,19 +1122,11 @@ function App() {
             <small>Vertinta pagal CLIP teksto ir vaizdo panašumą. Procentai nėra tikimybė, kad nuotrauka objektyviai gera. Tai papildoma AI nuomonė, o ne DPI matavimas.</small>
           </> : <p>Įkelkite CLIP modelį ir paleiskite papildomą AI analizę. Jos atsakymas bus pateiktas čia, po nuotrauka.</p>}
         </section>
-        <div className="quality-score-explanation">
-          <b>„Kadruoklis“ vertinimo pagrindas</b>
-          <ul>{qualityResult.kadruoklisEvaluation.reasons.map((r,i)=><li key={i} className={"quality-reason-" + r.tone}>{r.text}</li>)}</ul>
-          <p>Apskaičiuotas rekomenduojamas žiūrėjimo atstumas: apie {Math.round(qualityResult.kadruoklisEvaluation.viewingCm)} cm. Spaudos įrenginys parenkamas pagal trumpąją kraštinę: iki {kadruoklisConfig.maxMinilabCm} cm – Noritsu ({kadruoklisConfig.printers.noritsu.nativeDpi} DPI), didesniems – Mimaki ({kadruoklisConfig.printers.mimaki.nativeDpi} DPI).</p>
-        </div>
-        <div className="quality-score-explanation"><b>Kaip sudaryti rezultatai?</b><ul>
-          <li><b>Raiška:</b> apkirpto kadro pikseliai dalijami iš pasirinkto spaudos dydžio coliais.</li>
-          <li><b>Laplacian Variance:</b> matuoja gretimų pikselių šviesumo pokyčių dispersiją.</li>
-          <li><b>Tenengrad:</b> Sobel operatoriumi matuoja kraštų stiprumą.</li>
-          <li><b>64 zonos:</b> kadras padalijamas į 8 × 8 dalis. Raudona žymi gerokai silpnesnį detalumo signalą, žalia – stipresnį signalą, lyginant su tekstūrinėmis šios nuotraukos zonomis.</li>
-          <li><b>Triukšmas ir blokai:</b> pateikiami kaip indikatoriai, ne absoliutus kameros ar JPEG kokybės matavimas.</li>
-        </ul></div>
-        <p className="quality-summary-footnote">FFT atskiro skaičiavimo šiame etape dar nėra. Tai matematiniai indikatoriai, o ne laboratorinis fokusavimo matavimas. Lygios sritys, pavyzdžiui, dangus, nebaudžiamos vien dėl mažo detalių kiekio.</p>
+        <details className="quality-score-explanation"><summary><b>Techniniai matavimai (jei norite gilintis)</b></summary>
+          <p>Programa matuoja nuotraukos raišką, smulkių detalių aiškumą, triukšmą, šviesumą ir kontrastą. Skaičiai yra pagalbiniai indikatoriai, o ne laboratorinis fotoaparato ar objektyvo testas.</p>
+          <ul><li><b>Raiška:</b> kiek pikselių tenka vienam spaudos coliuje.</li><li><b>Ryškumas:</b> vertinama, ar nuotraukoje išlieka aiškūs kontūrai ir smulkios detalės.</li><li><b>Kontrastas:</b> skirtumas tarp šviesių ir tamsių vaizdo vietų. Labai mažas gali reikšti blankų vaizdą, labai didelis – prarastas detales.</li><li><b>Triukšmas:</b> atsitiktinis grūdėtumas, ypač matomas tamsiose vietose.</li><li><b>Šviesumas:</b> tikrinama, ar vaizdas nėra per tamsus arba per šviesus.</li></ul>
+          <p>Vien mažas detalumas lygioje vietoje, pavyzdžiui, danguje ar sienoje, nelaikomas defektu.</p>
+        </details>
       </section>}
     </section>
     <input ref={qualityFileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.tif,.tiff,image/*" hidden onChange={e=>{loadQualityImage(e.target.files?.[0]);e.target.value='';}}/>
