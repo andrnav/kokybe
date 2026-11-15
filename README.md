@@ -88,43 +88,18 @@ Projektas sukonfigūruotas publikavimui adresu `https://andrnav.github.io/kokybe
 - Jei HEIC nepavyksta perskaityti, klaidos pranešime atskirai pateikiama dekoderio ir naršyklės klaida.
 
 
-## Nuotraukos kokybės analizė (v2.1.0)
+## v2.1.0 – skirsnis „Nuotraukos kokybė“
 
-Kokybės skiltis analizuoja esamą kadrą, atsižvelgdama į kadravimo režimą, priartinimą, panoramą, orientaciją ir pasirinktą fizinį spaudos formatą. Pakeitus šiuos parametrus analizė perskaičiuojama.
+Skirsnis „Nuotraukos kokybė“ nebėra išjungtas. Jame kiekviena nuotrauka vertinama pagal **savo** pasirinktą formatą ir kadravimo tipą (Puiki / Gera / Tinka / Ribinė / Prasta), pateikiamos priežastys ir patarimas, o jei skiriamosios gebos nepakanka – koks didžiausias formatas dar tiktų.
 
-### Matematiniai indikatoriai
-- Efektyvi raiška pagal išlikusius kadro pikselius ir fizinį spaudos dydį.
-- Aštrumo indikatorius pagal Laplacian variance ir kraštų gradientų stiprumą.
-- Kontrastas pagal 2–98 procentilių šviesumo diapazoną.
-- Šviesių ir tamsių detalių praradimas.
-- Skaitmeninio triukšmo apytikslis aukšto dažnio likučio indikatorius.
-- Galimi JPEG blokavimo artefaktai.
-- Spalvų sodrumo ir bendro spalvų balanso indikatoriai.
-
-### Spausdintuvo parinkimas
-- Iki 30,5 cm spaudinio pločio imamas Noritsu QSS-3701 scenarijus.
-- Didesniam nei 30,5 cm pločiui imamas Mimaki JV100-160 scenarijus.
-- Tikslinė raiška interpoliuojama pagal „Kokybės nustatymuose“ esančią spaudos dydžio skalę. Didesniems spaudiniams naudojamas mažesnis DPI tikslas, nes jie paprastai žiūrimi iš toliau.
-
-### Svarbūs apribojimai
-Matematiniai indikatoriai yra diagnostinės heuristikos, o ne laboratorijoje kalibruotas spaudos kokybės matavimas. Aštrumo balas priklauso ir nuo vaizdo turinio, todėl galutiniam slenksčių sukalibravimui reikės realių gerų ir blogų nuotraukų pavyzdžių bei atspausdintų rezultatų. JPEG artefaktų indikatorius neidentifikuoja pakartotinių išsaugojimų skaičiaus. AI IQA modelis šiame etape dar neprijungtas.
-
-
-### Vietinio AI modelio planuojama integracija
-Naršyklės saugumo apribojimai neleidžia įprastai svetainei savarankiškai įsiminti ir vėliau skaityti bet kurio kompiuterio aplanko kelio. Todėl vietiniam modeliui reikės mažo vietinio Node.js pagalbinio proceso: naudotojas vieną kartą pasirenka modelio failą, kelias įrašomas į vietinį konfigūracijos failą, o aplikacija kreipiasi į `localhost` analizės API. Modelio svoriai liktų kompiuteryje ir nebūtų siunčiami kiekvieną kartą iš naujo. Ši paslauga dar neįdiegta v2.1.0.
-
-
-## 2.1.1 pataisymas
-- Pašalinta neegzistuojančio `score` kintamojo nuoroda, dėl kurios kokybės analizė nutrūkdavo su `score is not defined` klaida.
-
-
-## v2.2.0 – vietinis AI kokybės vertinimas
-
-- Pridėtas DBCNN no-reference IQA modelio vietinis servisas.
-- Modelis pirmą kartą įdiegiamas į `~/Desktop/FotoInspektorius/models`; vėliau pakartotinai nebesiunčiamas.
-- Web aplikacija AI vertinimui siunčia tik dabartinį apkirptą kadrą į vietinį `127.0.0.1:8765` servisą.
-- AI vertinimas papildomas matematinės analizės išvadas, jų nepakeičia.
-- Kokybės ataskaitos šviesiame fone pataisytas teksto kontrastas.
-- Diegimo instrukcijos: `ai-local/README.md`.
-
-**Apribojimas:** DBCNN modelis bendros fotografijos kokybės vertinimui apmokytas KonIQ-10k duomenimis. Jis nėra specialiai kalibruotas Noritsu QSS-3701 ar Mimaki JV100-160 spaudai. Jo signalą būtina palyginti su realiais spaudiniais; dabartinės interpretavimo ribos yra preliminarios.
+- **Efektyvus dpi → reikiamas dpi.** Reikiamas dpi ≈ 3438 ÷ žiūrėjimo atstumas coliais; atstumas = 1,25 × įstrižainė, bet 30–60 cm. Maža nuotrauka (10×15) reikalauja ~290 dpi, didelė – ~145 dpi.
+- **Spausdintuvas parenkamas pagal dydį:** trumpesnė kraštinė ≤ 30,5 cm ir ilgesnė ≤ 91,4 cm – Noritsu QSS-3701 (300 dpi), kitaip – Mimaki JV100-160.
+- **Vaizdo analizė** (mygtukas „Analizuoti nuotraukas“): ryškumas ir triukšmas matuojami ties tikrais taškais iš iki 49 fragmentų, taip pat šviesos išdegimas ir bendras šviesumas. Neryški nuotrauka laikoma mažesnės skiriamosios gebos.
+- **AI antra nuomonė (neprivaloma):** CLIP-IQA metodas per Transformers.js. Biblioteka ir modelis (`Xenova/clip-vit-base-patch16`, apie 150 MB) atsisiunčiami tik paspaudus „Atsisiųsti ir įjungti AI“, be raktų ir paskyros; vertinimas vyksta naršyklėje ir nuotraukos niekur nesiunčiamos. AI gali sumažinti įvertinimą ne daugiau kaip vienu laipsniu.
+- Skirsnio nustatymai (žiūrėjimo atstumas, spausdintuvų dpi, ryškumo / triukšmo ribos) keičiami pačiame skirsnyje ir išsaugomi naršyklėje (`foto-inspektorius-quality-v1`).
+- „Laisvas“ režimo nuotraukoms vertinama tik vaizdo kokybė, nes spaudos dydis nenustatytas.
+- Eilutės paspaudimas atidaro tą nuotrauką kadravimo skirsnyje. Analizės ir AI rezultatai išlieka perjungiant skirsnius.
+- **Pataisymas:** „Įtalpinta“ režime įrankių juostoje rodomas DPI dabar įskaito priartinimą (priartinus ×2 nuotrauka spaudoje didinama, todėl realus dpi perpus mažesnis). Toks pat skaičiavimas naudojamas ir naujame skirsnyje.
+- Kadravimo įrankių juostoje esantis „Kokybė“ indikatorius ir jo skalė (krumpliaračio nustatymai) nekeisti, todėl kraštutiniais atvejais jo ir naujojo skirsnio vertinimai gali skirtis.
+- Kai skirsnis „Nuotraukos kokybė“ atidarytas, rodyklės ←/→ nekeičia aktyvios nuotraukos.
+- Nauji failai: `src/quality/` (`engine.js`, `analyze.js`, `ai.js`, `useQuality.js`, `QualityTab.jsx`). Naujų npm priklausomybių nėra.

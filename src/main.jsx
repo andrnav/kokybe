@@ -5,9 +5,10 @@ import { heicTo } from 'heic-to';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import * as UTIF from 'utif';
+import QualityTab from './quality/QualityTab.jsx';
+import { useQuality } from './quality/useQuality.js';
 import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2 } from 'lucide-react';
 import './style.css';
-import { analyzePhoto, createQualityCropBlob } from './quality/analyze.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -186,6 +187,31 @@ function getCrop(photo) {
   const cy = ih / 2 - clamp(Number(photo.pan?.y || 0), -1, 1) * maxY;
   return { sx: cx - sw / 2, sy: cy - sh / 2, sw, sh, baseW, baseH, target };
 }
+// Fizinis spaudinio dydis ir efektyvi šaltinio raiška. Naudojama kadravimo įrankių juostoje ir skirsnyje „Nuotraukos kokybė“.
+function getPhotoPrint(photo) {
+  const mode = photo.mode || 'crop';
+  const crop = getCrop(photo);
+  let widthPx = Math.max(1, Math.round(crop.sw)), heightPx = Math.max(1, Math.round(crop.sh));
+  if (mode === 'free') return { free: true, mode, widthPx, heightPx };
+  const [a, b] = getFormat(photo).cm;
+  const portrait = getOrientation(photo);
+  const wCm = portrait ? a : b, hCm = portrait ? b : a;
+  let dpiX, dpiY;
+  if (mode === 'real') {
+    // Export is resampled to 320 DPI, but quality must reflect source pixels before upscaling.
+    dpiX = crop.sw / (wCm / 2.54); dpiY = crop.sh / (hCm / 2.54);
+    widthPx = Math.round(wCm / 2.54 * 320); heightPx = Math.round(hCm / 2.54 * 320);
+  } else if (mode === 'fit') {
+    const target = getTargetRatio(photo);
+    widthPx = Math.max(photo.width, Math.ceil(photo.height * target)); heightPx = Math.max(photo.height, Math.ceil(photo.width / target));
+    // Priartinant nuotrauka lape didinama, todėl šaltinio taškų tankis krinta tiek pat kartų.
+    const enlarge = Math.min(widthPx / photo.width, heightPx / photo.height) * clamp(Number(photo.zoom || 1), 1, 4);
+    dpiX = widthPx / enlarge / (wCm / 2.54); dpiY = heightPx / enlarge / (hCm / 2.54);
+  } else {
+    dpiX = widthPx / (wCm / 2.54); dpiY = heightPx / (hCm / 2.54);
+  }
+  return { free: false, mode, wCm, hCm, widthPx, heightPx, dpiX, dpiY, effDpi: Math.min(dpiX, dpiY) };
+}
 function renderPhoto(photo, canvas, { thumbnail = false } = {}) {
   const fmt = getFormat(photo);
   const portrait = getOrientation(photo);
@@ -236,6 +262,8 @@ function renderPhoto(photo, canvas, { thumbnail = false } = {}) {
 
 function App() {
   const [photos, setPhotos] = useState([]);
+  const [tab, setTab] = useState('crop');
+  const quality = useQuality(photos);
   const [activeId, setActiveId] = useState(null);
   const [format, setFormat] = useState('10x15');
   const [customCm, setCustomCm] = useState([10, 15]);
@@ -248,13 +276,6 @@ function App() {
   const [message, setMessage] = useState('');
   const [qualityScale, setQualityScale] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('foto-inspektorius-quality-scale')); return Array.isArray(saved) && saved.length ? saved : DEFAULT_QUALITY_SCALE; } catch { return DEFAULT_QUALITY_SCALE; } });
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('crop');
-  const [qualityReport, setQualityReport] = useState(null);
-  const [qualityBusy, setQualityBusy] = useState(false);
-  const [qualityError, setQualityError] = useState('');
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiResult, setAiResult] = useState(null);
-  const [aiError, setAiError] = useState('');
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
   const [resizeStart, setResizeStart] = useState(null);
@@ -274,51 +295,12 @@ function App() {
   useEffect(() => () => photos.forEach(p => URL.revokeObjectURL(p.url)), []);
   useEffect(() => { localStorage.setItem('foto-inspektorius-quality-scale', JSON.stringify(qualityScale)); }, [qualityScale]);
   useEffect(() => {
-    if (activeTab !== 'quality' || !active) return;
-    let cancelled = false;
-    setQualityBusy(true);
-    setQualityError('');
-    setAiResult(null);
-    setAiError('');
-    try {
-      const fmt = getFormat(active);
-      const targetDpi = getTargetDpi(Math.max(...fmt.cm), qualityScale);
-      const report = analyzePhoto(active, { format: fmt, mode: active.mode || 'crop', getCrop, getOrientation, getTargetRatio, targetDpi });
-      if (!cancelled) setQualityReport(report);
-    } catch (error) {
-      if (!cancelled) { setQualityReport(null); setQualityError(error?.message || 'Nepavyko išanalizuoti kadro.'); }
-    } finally {
-      if (!cancelled) setQualityBusy(false);
-    }
-    return () => { cancelled = true; };
-  }, [activeTab, activeId, active?.zoom, active?.pan?.x, active?.pan?.y, active?.mode, active?.format, active?.customCm?.[0], active?.customCm?.[1], active?.orientation, active?.freeCrop?.x, active?.freeCrop?.y, active?.freeCrop?.w, active?.freeCrop?.h, qualityScale]);
-
-  useEffect(() => {
     const node = stageRef.current;
     if (!node) return;
     const update = () => { const r = node.getBoundingClientRect(); if (r.width && r.height) setStageSizes({ main: { w: r.width, h: r.height } }); };
     const ro = new ResizeObserver(update); ro.observe(node); update();
     return () => ro.disconnect();
   }, [!!active]);
-
-  const runAiQuality = async () => {
-    if (!active) return;
-    setAiBusy(true); setAiError(''); setAiResult(null);
-    try {
-      const fmt = getFormat(active);
-      const blob = await createQualityCropBlob(active, { format: fmt, mode: active.mode || 'crop', getCrop, getOrientation, getTargetRatio });
-      const body = new FormData();
-      body.append('image', blob, 'print-crop.jpg');
-      body.append('print_width_cm', String(Math.max(...fmt.cm)));
-      const response = await fetch('http://127.0.0.1:8765/analyze', { method: 'POST', body });
-      if (!response.ok) throw new Error(`Vietinis AI servisas grąžino klaidą (${response.status}).`);
-      const result = await response.json();
-      if (!result || typeof result.score !== 'number') throw new Error('AI servisas grąžino netinkamą atsakymą.');
-      setAiResult(result);
-    } catch (error) {
-      setAiError(error?.message || 'Nepavyko atlikti AI vertinimo. Patikrinkite, ar paleistas vietinis AI servisas.');
-    } finally { setAiBusy(false); }
-  };
 
   const updatePhoto = (id, patch) => setPhotos(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
   const deletePhoto = id => {
@@ -357,7 +339,7 @@ function App() {
   };
   useEffect(() => {
     const onKeyDown = e => {
-      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (tab !== 'crop' || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
       const tag = e.target?.tagName?.toLowerCase();
       if (['input', 'textarea', 'select'].includes(tag) || e.target?.isContentEditable) return;
       if (!photos.length) return;
@@ -368,7 +350,7 @@ function App() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [photos, activeId]);
+  }, [photos, activeId, tab]);
 
   const applyModeToAll = nextMode => {
     setMode(nextMode);
@@ -490,21 +472,10 @@ function App() {
   }, [photos]);
 
   const metrics = active ? (() => {
-    const crop = getCrop(active);
-    let widthPx = Math.max(1, Math.round(crop.sw)), heightPx = Math.max(1, Math.round(crop.sh));
-    if (selectedMode === 'free') return { widthPx, heightPx, size: 'Laisvas formatas', dpi: '—', quality: 'Nevertinama', qualityClass: 'neutral', targetDpi: null };
-    const [a, b] = getFormat(active).cm;
-    const portrait = getOrientation(active);
-    const wCm = portrait ? a : b, hCm = portrait ? b : a;
-    let dpiX, dpiY;
-    if (selectedMode === 'real') {
-      // Export is resampled to 320 DPI, but quality must reflect source pixels before upscaling.
-      dpiX = crop.sw / (wCm / 2.54); dpiY = crop.sh / (hCm / 2.54);
-      widthPx = Math.round(wCm / 2.54 * 320); heightPx = Math.round(hCm / 2.54 * 320);
-    } else {
-      if (selectedMode === 'fit') { const target = getTargetRatio(active); widthPx = Math.max(active.width, Math.ceil(active.height * target)); heightPx = Math.max(active.height, Math.ceil(active.width / target)); }
-      dpiX = widthPx / (wCm / 2.54); dpiY = heightPx / (hCm / 2.54);
-    }
+    const print = getPhotoPrint(active);
+    const { widthPx, heightPx } = print;
+    if (print.free) return { widthPx, heightPx, size: 'Laisvas formatas', dpi: '—', quality: 'Nevertinama', qualityClass: 'neutral', targetDpi: null };
+    const { wCm, hCm, dpiX, dpiY } = print;
     const targetDpi = getTargetDpi(Math.max(wCm, hCm), qualityScale), ratio = Math.min(dpiX, dpiY) / targetDpi;
     const quality = ratio >= 1 ? 'Puiki' : ratio >= .85 ? 'Gera' : ratio >= .65 ? 'Ribinė' : 'Prasta';
     const qualityClass = ratio >= 1 ? 'good' : ratio >= .85 ? 'fair' : ratio >= .65 ? 'warning' : 'bad';
@@ -584,28 +555,17 @@ function App() {
 
   const currentFormatId = active?.format || format;
   return <div className="app-shell">
-    <header className="topbar"><div className="brand"><div className="brand-icon"><Camera size={21}/></div><span>Foto inspektorius</span></div><nav className="tabs"><button className={`tab ${activeTab === 'crop' ? 'active' : ''}`} onClick={() => setActiveTab('crop')}><Crop size={17}/> Kadravimas</button><button className={`tab ${activeTab === 'quality' ? 'active' : ''}`} onClick={() => setActiveTab('quality')}><Images size={17}/> Nuotraukos kokybė</button></nav><div className="top-actions"><span className="batch-count">{photos.length ? `Nuotraukų partija · ${photos.length} fail.` : 'Nauja nuotraukų partija'}</span><button className="icon-button" title="Kokybės nustatymai" onClick={() => setSettingsOpen(true)}><Settings2 size={19}/></button><button className="download-button" onClick={exportAll} disabled={!photos.length || busy}><Download size={17}/> Atsisiųsti viską <span className="zip-pill">ZIP</span></button></div></header>
-    {activeTab === 'crop' && <main className="workspace">
+    <header className="topbar"><div className="brand"><div className="brand-icon"><Camera size={21}/></div><span>Foto inspektorius</span></div><nav className="tabs"><button className={tab === 'crop' ? 'tab active' : 'tab'} onClick={() => setTab('crop')}><Crop size={17}/> Kadravimas</button><button className={tab === 'quality' ? 'tab active' : 'tab'} onClick={() => setTab('quality')}><Images size={17}/> Nuotraukos kokybė</button></nav><div className="top-actions"><span className="batch-count">{photos.length ? `Nuotraukų partija · ${photos.length} fail.` : 'Nauja nuotraukų partija'}</span><button className="icon-button" title="Kokybės nustatymai" onClick={() => setSettingsOpen(true)}><Settings2 size={19}/></button><button className="download-button" onClick={exportAll} disabled={!photos.length || busy}><Download size={17}/> Atsisiųsti viską <span className="zip-pill">ZIP</span></button></div></header>
+    <main className="workspace" style={tab === 'crop' ? undefined : { display: 'none' }}>
       <aside className="left-panel"><div className="panel-title">1. Spausdinimo formatas</div><div className="select-wrap format-select"><select value={currentFormatId} disabled={selectedMode === 'free'} onChange={e => changeFormat(e.target.value)}>{FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}<option value="custom">Pagal skaičius</option></select></div>
         <div className="custom-format"><div className="custom-format-title">Rankinis formatas</div><div className="custom-format-fields"><input disabled={selectedMode === "free"} aria-label="Pirmas matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[0]} onChange={e => changeCustom(0, e.target.value)}/><span>×</span><input disabled={selectedMode === "free"} aria-label="Antras matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[1]} onChange={e => changeCustom(1, e.target.value)}/></div></div>
         <div className="section-divider"/><div className="panel-title">2. Kadravimo tipas</div><div className="mode-list"><button className={selectedMode === 'crop' ? 'mode selected' : 'mode'} onClick={() => { setMode('crop'); if (active) patchActive({ mode: 'crop' }); }}><Crop/><span>Kadravimas</span></button><button className={selectedMode === 'fit' ? 'mode selected' : 'mode'} onClick={() => { setMode('fit'); if (active) patchActive({ mode: 'fit' }); }}><Square/><span>Įtalpinta</span></button><button className={selectedMode === 'real' ? 'mode selected' : 'mode'} onClick={() => { setMode('real'); if (active) patchActive({ mode: 'real' }); }}><Ruler/><span>Real Size<small>320 DPI</small></span></button><button className={selectedMode === 'free' ? 'mode selected' : 'mode'} onClick={() => { setMode('free'); if (active) patchActive({ mode: 'free', zoom: 1, pan: { x: 0, y: 0 }, freeCrop: { x: 0, y: 0, w: active.width, h: active.height } }); }}><Crop/><span>Laisvas</span></button></div><button className="apply-all-button" onClick={() => applyModeToAll(selectedMode)} disabled={!photos.length}>Taikyti visoms nuotraukoms</button>
         <div className="section-divider"/><div className="panel-title">3. Eksportas</div><div className="select-wrap"><select value={exportFormat} onChange={e => setExportFormat(e.target.value)}><option value="jpg">JPG</option><option value="tif">TIFF · 8 bitų · Lossless</option></select></div></aside>
       <section className="editor-column"><div className="editor-toolbar"><div className="photo-title-group"><div className="photo-name">{active?.name || 'Nuotrauka nepasirinkta'}</div><div className="image-metrics toolbar-metrics">{metrics && <><span><b>{metrics.widthPx.toLocaleString('lt-LT')} × {metrics.heightPx.toLocaleString('lt-LT')} px</b></span><span>{metrics.size}</span><span><b>{metrics.dpi}</b></span><span className={`quality-indicator ${metrics.qualityClass}`} title={metrics.targetDpi ? `Tikslas: ${metrics.targetDpi} DPI` : 'Laisvam formatui kokybė pagal spaudos dydį neskaičiuojama'}>Kokybė: <b>{metrics.quality}</b></span></>}</div></div><div className="editor-nav"><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i > 0) navigateTo(photos[i - 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === 0}><ChevronLeft size={17}/> Ankstesnė</button><span>{active ? `${photos.findIndex(p => p.id === activeId) + 1} iš ${photos.length}` : '0 iš 0'}</span><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i < photos.length - 1) navigateTo(photos[i + 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === photos.length - 1}>Kita <ChevronRight size={17}/></button></div></div>
         {renderStage()}<div className="editor-footer"><div className="orientation-control"><span>Orientacija</span><div className="segmented"><button className={selectedOrientation === 'auto' ? 'active' : ''} onClick={() => patchActive({ orientation: 'auto' })}>Automatinė</button><button className={selectedOrientation === 'vertical' ? 'active' : ''} onClick={() => patchActive({ orientation: 'vertical' })}>Vertikali</button><button className={selectedOrientation === 'horizontal' ? 'active' : ''} onClick={() => patchActive({ orientation: 'horizontal' })}>Horizontali</button></div></div><div className="footer-actions"><button className="secondary" onClick={reset} disabled={!active}><RotateCcw size={16}/> Atstatyti</button><button className="secondary" onClick={exportCurrent} disabled={!active}><Download size={16}/> Atsisiųsti šią nuotrauką</button></div></div></section>
-    </main>}
-    {activeTab === 'quality' && <main className="quality-workspace">
-      {!active ? <div className="quality-empty"><Images size={42}/><h2>Nėra pasirinktos nuotraukos</h2><p>Pirmiausia įkelkite nuotraukas ir pasirinkite kadrą.</p><button className="primary" onClick={() => setActiveTab('crop')}>Grįžti į kadravimą</button></div> : <div className="quality-content">
-        <div className="quality-page-heading"><div><span className="eyebrow">SPAUSDINIMO KOKYBĖ</span><h1>{active.name}</h1><p>Vertinamas dabartinis apkirptas kadras ir pasirinktas spaudos formatas, ne visa originali nuotrauka.</p></div><button className="secondary" onClick={() => setActiveTab('crop')}><Crop size={16}/> Keisti kadrą</button></div>
-        {qualityBusy ? <div className="quality-loading"><Loader2 className="spin"/> Analizuojamas apkirptas kadras…</div> : qualityError ? <div className="quality-error">{qualityError}</div> : qualityReport && <>
-          <div className={`quality-verdict ${qualityReport.verdictClass}`}><div><span className="eyebrow">BENDRA IŠVADA</span><h2>{qualityReport.verdict}</h2><p>{qualityReport.printer} · {qualityReport.printSize} · {qualityReport.viewing}</p></div><div className="quality-score"><strong>✓</strong><span>analizė baigta</span></div></div>
-          <div className="quality-summary-grid"><div className="quality-summary-card"><span>Numatomas spausdintuvas</span><b>{qualityReport.printer}</b><small>{qualityReport.printer.includes('Noritsu') ? 'Spaudinio plotis iki 30,5 cm' : 'Spaudinio plotis virš 30,5 cm'}</small></div><div className="quality-summary-card"><span>Efektyvi raiška po kadravimo</span><b>{qualityReport.dpi} DPI</b><small>Rekomenduojama pagal dydį: {qualityReport.targetDpi} DPI</small></div><div className="quality-summary-card"><span>Pasirinktas spaudos formatas</span><b>{qualityReport.printSize}</b><small>{qualityReport.viewing}</small></div></div>
-          <section className="quality-findings"><div className="quality-section-title"><div><h2>Ką parodė analizė?</h2><p>Žmogiška išvada apie svarbiausius spaudos kokybės požymius.</p></div><span className="analysis-label">MATEMATINĖ ANALIZĖ</span></div>{qualityReport.findings.map((item, i) => <div className={`finding-item ${item.level}`} key={`${item.title}-${i}`}><span className="finding-icon">{item.level === 'good' ? '✓' : item.level === 'bad' ? '!' : item.level === 'warning' ? '⚠' : 'i'}</span><div><b>{item.title}</b><p>{item.text}</p></div></div>)}</section>
-          <section className="quality-findings"><div className="quality-section-title"><div><h2>Vaizdo savybės</h2><p>Techniniai matavimai paversti suprantamais apibūdinimais.</p></div></div><div className="quality-property-grid"><div><span>Aštrumas</span><b>{qualityReport.metrics.sharpness < 45 ? 'Silpnas' : qualityReport.metrics.sharpness < 115 ? 'Vidutinis' : 'Geras'}</b></div><div><span>Kontrastas</span><b>{qualityReport.metrics.contrast < 55 ? 'Žemas' : qualityReport.metrics.contrast < 105 ? 'Vidutinis' : 'Geras'}</b></div><div><span>Triukšmas</span><b>{qualityReport.metrics.noise > 13 ? 'Pastebimas' : qualityReport.metrics.noise > 7 ? 'Nedidelis' : 'Mažas'}</b></div><div><span>Spalvų balansas</span><b>{qualityReport.metrics.colorCast > 16 ? 'Galimas atspalvio poslinkis' : 'Ryškaus poslinkio nėra'}</b></div><div><span>Šviesios detalės</span><b>{qualityReport.metrics.highlights > 2 ? 'Dalis prarasta' : 'Išsaugotos'}</b></div><div><span>Tamsios detalės</span><b>{qualityReport.metrics.shadows > 3 ? 'Dalis prarasta' : 'Išsaugotos'}</b></div></div></section>
-          <section className="quality-ai-panel"><div className="ai-icon">AI</div><div className="ai-panel-content"><h2>AI techninės kokybės vertinimas</h2><p>DBCNN modelis vertina bendrą fotografijos techninę kokybę. Analizei siunčiamas tik dabartinis apkirptas kadras. Vaizdas apdorojamas šiame kompiuteryje, ne debesijoje.</p>{aiResult ? <div className="ai-result"><b>{aiResult.label}</b><span>{aiResult.explanation}</span><small>DBCNN modelis · KonIQ-10k duomenų bazė · preliminarus vertinimas</small></div> : <small>{aiError || 'AI modelis veikia per atskirą vietinį servisą. Pirmą kartą reikia įdiegti modelį ir paleisti servisą.'}</small>}</div><button className="ai-run-button" onClick={runAiQuality} disabled={aiBusy || qualityBusy}>{aiBusy ? <><Loader2 className="spin" size={15}/> Vertinama…</> : 'Atlikti AI vertinimą'}</button></section>
-        </>}
-      </div>}
-    </main>}
-    <section className={`filmstrip ${dropZone === 'strip' ? 'drag-over' : ''}`}
+    </main>
+    {tab === 'quality' && <QualityTab photos={photos} thumbs={thumbSources} getPrint={getPhotoPrint} quality={quality} activeId={activeId} appMessage={message} onOpen={id => { setTab('crop'); if (id !== activeId) navigateTo(id); }} />}
+    <section className={`filmstrip ${dropZone === 'strip' ? 'drag-over' : ''}`} style={tab === 'crop' ? undefined : { display: 'none' }}
       onDragEnter={e => { e.preventDefault(); setDropZone('strip'); }}
       onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
       onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget)) setDropZone(''); }}

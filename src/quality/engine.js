@@ -178,15 +178,6 @@ function imageFindings(m, a, cfg, dpiEff) {
       else reasons.push({ tone: 'ok', text: `Ekspozicija normali (vidurkis ${Math.round(e.mean)}).` });
     }
   }
-  if (m?.findings?.length) {
-    for (const finding of m.findings) {
-      const already = reasons.some(r => r.text.toLowerCase().includes(finding.text.toLowerCase().slice(0, 24)));
-      if (!already) {
-        reasons.push({ tone: finding.level === 'bad' ? 'bad' : 'warn', text: finding.text });
-        if (finding.level === 'bad') pen = Math.min(2, pen + 1);
-      }
-    }
-  }
   if (a) {
     const bad = cfg.aiBad;
     const sharpAlready = m && m.sharp != null && m.sharp < cfg.sharp.blurry;
