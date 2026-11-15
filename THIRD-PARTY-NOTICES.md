@@ -10,13 +10,11 @@ https://github.com/hoppergee/heic-to
 The package uses libheif 1.23.7 internally. Refer to the upstream repository for the
 corresponding third-party licensing and source details.
 
-## ONNX Runtime Web
+## Transformers.js and the CLIP model (optional AI quality check)
 
-The experimental in-browser image quality assessment feature uses `onnxruntime-web`.
-See https://github.com/microsoft/onnxruntime and its included license files.
-
-## DBCNN ONNX image-quality model
-
-The experimental DBCNN model is downloaded on first use from:
-https://huggingface.co/86Cao/IQA-ONNX-Models
-The model repository declares Apache-2.0; the model card notes that original model weights remain subject to their respective licenses. See the repository model card and original DBCNN paper before redistribution.
+The optional "AI antra nuomonė" feature loads Transformers.js (Hugging Face, Apache-2.0)
+from the jsDelivr CDN and downloads the model `Xenova/clip-vit-base-patch16` (an ONNX
+conversion of OpenAI CLIP) from Hugging Face. Both are fetched at runtime only after the
+user clicks "Atsisiųsti ir įjungti AI"; neither is bundled with Foto inspektorius.
+See the model card on Hugging Face for the model's license terms.
+https://github.com/huggingface/transformers.js
