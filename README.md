@@ -103,3 +103,13 @@ Skirsnis „Nuotraukos kokybė“ nebėra išjungtas. Jame kiekviena nuotrauka v
 - Kadravimo įrankių juostoje esantis „Kokybė“ indikatorius ir jo skalė (krumpliaračio nustatymai) nekeisti, todėl kraštutiniais atvejais jo ir naujojo skirsnio vertinimai gali skirtis.
 - Kai skirsnis „Nuotraukos kokybė“ atidarytas, rodyklės ←/→ nekeičia aktyvios nuotraukos.
 - Nauji failai: `src/quality/` (`engine.js`, `analyze.js`, `ai.js`, `useQuality.js`, `QualityTab.jsx`). Naujų npm priklausomybių nėra.
+
+
+## v2.1.2 – supaprastintas kokybės vertinimas
+
+- Pašalintas ilgas paaiškinimas, „tik problemines“ filtras ir viršutinis įvertinimų skaitiklis.
+- Paliktas pagrindinis „Analizuoti nuotraukas“ mygtukas.
+- Pirmoji kokybės pastaba rodo numatomą žiūrėjimo atstumą ir gerai kokybei reikalingą DPI.
+- Matematinės išvados pateikiamos žmonėms suprantamais įvertinimais: Puiki, Gera, Tinka, Ribinė, Prasta.
+- „AI antra nuomonė“ pervadinta į „AI patikra“.
+- AI rezultatai rodomi atskirai kaip 1–5 įvertinimai: aštrumas, vaizdo švara, ekspozicija, kontrastas ir bendra kokybė. 1–5 skalė yra sąsajos interpretacija, perskaičiuota iš CLIP-IQA porinių tikimybių, o ne modelio gamyklinis balas.

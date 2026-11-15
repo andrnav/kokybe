@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { LEVELS, evaluate, evaluateFree, fmt1 } from './engine.js';
 
 const MODE_LABEL = { crop: 'Kadravimas', fit: 'Įtalpinta', real: 'Real Size', free: 'Laisvas' };
@@ -24,10 +24,21 @@ const FIELDS = [
   { p: ['aiBad'], label: 'AI laiko problema, jei tikimybė <', step: 0.05 },
 ];
 const getP = (o, p) => p.reduce((a, k) => a[k], o);
+const aiLevel = value => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return n >= .80 ? 5 : n >= .65 ? 4 : n >= .50 ? 3 : n >= .35 ? 2 : 1;
+};
+const AI_METRICS = [
+  ['sharp', 'Aštrumas'],
+  ['clean', 'Vaizdo švara'],
+  ['bright', 'Ekspozicija'],
+  ['contrast', 'Kontrastas'],
+  ['quality', 'Bendra kokybė'],
+];
 
 export default function QualityTab({ photos, thumbs, getPrint, quality, activeId, onOpen, appMessage }) {
   const { cfg, analysis, job, ai, analyzeAll, loadAi, runAi, stopAi, updateConfig, resetConfig } = quality;
-  const [onlyBad, setOnlyBad] = useState(false);
 
   const rows = useMemo(() => photos.map((p, i) => {
     const a = analysis[p.id] || {};
@@ -38,47 +49,28 @@ export default function QualityTab({ photos, thumbs, getPrint, quality, activeId
     return { p, i, a, print, q };
   }), [photos, analysis, cfg, getPrint]);
 
-  const counts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0, free: 0 };
-  rows.forEach(r => { if (r.q.free) counts.free++; else counts[r.q.level]++; });
-  const analyzed = photos.filter(p => analysis[p.id]?.metrics).length;
-  const aiDone = photos.filter(p => analysis[p.id]?.ai).length;
-  const shown = onlyBad ? rows.filter(r => !r.q.free && r.q.level <= 2) : rows;
-  const problems = counts[1] + counts[2];
   const activeExists = photos.some(p => p.id === activeId);
 
   return <section className="quality-page" aria-label="Nuotraukos kokybė">
     <div className="quality-inner">
-      <div className="q-head">
-        <div className="q-ctx">
-          Kiekviena nuotrauka vertinama pagal <b>jos pasirinktą formatą ir kadravimo tipą</b> (keičiama skirsnyje „Kadravimas“).
-          Spausdintuvas parenkamas automatiškai: iki {fmt1(cfg.maxMinilabCm)} cm pločio – {cfg.printers.noritsu.name.split(' (')[0]}, didesniems – {cfg.printers.mimaki.name.split(' (')[0]}.
-        </div>
+      <div className="q-head q-head-simple">
         <div className="q-actions">
           <button className="primary" onClick={analyzeAll} disabled={!photos.length || job.analyzing}>Analizuoti nuotraukas</button>
-          <label className="q-only"><input type="checkbox" checked={onlyBad} onChange={e => setOnlyBad(e.target.checked)} /> tik problemines</label>
           <span className="q-status">{job.text}</span>
         </div>
       </div>
 
-      <div className="q-summary">
-        {[5, 4, 3, 2, 1].map(l => <span key={l} className="q-sum"><span className={`q-badge ${LEVELS[l].cls}`}>{LEVELS[l].label}</span><b>{counts[l]}</b></span>)}
-        {counts.free > 0 && <span className="q-sum"><span className="q-badge neutral">Laisvas</span><b>{counts.free}</b></span>}
-        <span className="q-sum muted">Išanalizuota: <b>{analyzed}/{photos.length}</b></span>
-        {aiDone > 0 && <span className="q-sum muted">AI: <b>{aiDone}/{photos.length}</b></span>}
-        {problems > 0 && <span className="q-sum q-problem">Nerekomenduojama / ribinė: <b>{problems}</b></span>}
-      </div>
-
       <div className="q-ai">
-        <div className="q-ai-head"><b>AI antra nuomonė</b> <span className="muted">(neprivaloma, veikia jūsų naršyklėje, be raktų ir be paskyros)</span></div>
+        <div className="q-ai-head"><b>AI patikra</b> <span className="muted">(neprivaloma, veikia jūsų naršyklėje, be raktų ir be paskyros)</span></div>
         <p className="muted">
-          Atsisiunčiamas nedidelis CLIP modelis (apie 150 MB, vienkartinis), kuris jūsų kompiuterio procesoriumi įvertina ryškumą, triukšmą ir bendrą kokybę.
+          Papildomas AI vertinimas pagal aštrumą, vaizdo švarą, ekspoziciją, kontrastą ir bendrą kokybę.
           Nuotraukos niekur nesiunčiamos. Tai papildoma nuomonė po matematinės analizės, o ne vietoj jos.
         </p>
         <div className="q-ai-actions">
           {!ai.ready && <button className="secondary" onClick={loadAi} disabled={ai.loading}>{ai.loading ? 'Siunčiama…' : 'Atsisiųsti ir įjungti AI'}</button>}
           {ai.ready && <>
-            <button className="secondary" onClick={() => runAi(null)} disabled={ai.running || !photos.length}>AI: įvertinti visas</button>
-            <button className="secondary" onClick={() => runAi([activeId])} disabled={ai.running || !activeExists}>AI: tik pasirinktą</button>
+            <button className="secondary" onClick={() => runAi(null)} disabled={ai.running || !photos.length}>AI patikrinti visas</button>
+            <button className="secondary" onClick={() => runAi([activeId])} disabled={ai.running || !activeExists}>AI patikrinti pasirinktą</button>
           </>}
           {ai.running && <button className="secondary" onClick={stopAi}>Sustabdyti</button>}
           <span className={`q-status ${ai.error ? 'err' : ''}`}>{ai.text}</span>
@@ -88,8 +80,8 @@ export default function QualityTab({ photos, thumbs, getPrint, quality, activeId
 
       <div className="q-list">
         {!photos.length && <div className="q-empty">Nuotraukų dar nėra. Įkelkite jas skirsnyje „Kadravimas“.</div>}
-        {photos.length > 0 && !shown.length && <div className="q-empty">Problemų nerasta.</div>}
-        {shown.map(({ p, i, a, print, q }) => (
+        {photos.length > 0 && !rows.length && <div className="q-empty">Nuotraukų nėra.</div>}
+        {rows.map(({ p, i, a, print, q }) => (
           <div key={p.id} className={`q-row ${p.id === activeId ? 'current' : ''}`} role="button" tabIndex={0}
             title="Atidaryti kadravimo skirsnyje" onClick={() => onOpen(p.id)}
             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(p.id); } }}>
@@ -103,6 +95,18 @@ export default function QualityTab({ photos, thumbs, getPrint, quality, activeId
             </div>
             <div className="q-res">
               <ul className="q-why">{q.reasons.map((r, k) => <li key={k} className={r.tone}>{r.text}</li>)}</ul>
+              {a.ai && <div className="q-ai-scores">
+                <b>AI įvertinimas</b>
+                <div className="q-ai-score-grid">
+                  {AI_METRICS.map(([key, label]) => {
+                    const level = aiLevel(a.ai[key]);
+                    return <div className="q-ai-score" key={key}>
+                      <span>{label}</span>
+                      <strong>{level ? `${level}/5 · ${LEVELS[level].label}` : 'Nėra duomenų'}</strong>
+                    </div>;
+                  })}
+                </div>
+              </div>}
               <div className={`q-adv ${q.cls}`}>{q.advice}</div>
               {!a.metrics && !print.free && <div className="q-pending">Ryškumas ir triukšmas dar nevertinti – spauskite „Analizuoti nuotraukas“. Kol kas vertinama tik pagal dpi.</div>}
             </div>

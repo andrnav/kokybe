@@ -200,3 +200,15 @@
 .q-how a{color:#70adff}
 .q-footer-msg{margin-top:auto;padding:8px 4px 0;font-size:11px;color:#8da0b7}
 @media(max-width:760px){.q-row{grid-template-columns:76px minmax(0,1fr)}.q-thumb{width:76px;height:56px}.q-res{grid-column:1/-1}}
+
+/* v2.1.2: supaprastinta kokybės skiltis ir įskaitomas AI vertinimas */
+.q-head-simple{justify-content:flex-start;margin-bottom:14px}
+.q-head-simple .q-actions{width:100%;justify-content:flex-start}
+.q-head-simple .q-status{margin-left:4px}
+.q-ai-scores{margin-top:12px;padding:11px 12px;background:#202936;border:1px solid #354254;border-radius:9px}
+.q-ai-scores>b{display:block;color:#e8eef7;font-size:12px;margin-bottom:9px}
+.q-ai-score-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.q-ai-score{display:flex;flex-direction:column;gap:5px;min-width:0;padding:9px;background:#151c26;border:1px solid #303b49;border-radius:7px}
+.q-ai-score span{font-size:10px;color:#aab6c6}
+.q-ai-score strong{font-size:11px;color:#e8eef7}
+@media(max-width:900px){.q-ai-score-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

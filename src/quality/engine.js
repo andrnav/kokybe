@@ -3,6 +3,7 @@
  * Ribos yra pradinės vertės – jas galima keisti skirsnyje „Nuotraukos kokybė“. */
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const humanLevel = (value, thresholds) => value >= thresholds[0] ? 'Puiki' : value >= thresholds[1] ? 'Gera' : value >= thresholds[2] ? 'Tinka' : value >= thresholds[3] ? 'Ribinė' : 'Prasta';
 export const fmt1 = n => String(Math.round(n * 10) / 10).replace('.', ',');
 
 export const LEVELS = {
@@ -160,13 +161,13 @@ function imageFindings(m, a, cfg, dpiEff) {
   const eff = dpiEff != null ? ` (~${Math.round(dpiEff)} dpi)` : '';
   if (m) {
     if (m.sharp == null) reasons.push({ tone: 'warn', text: 'Ryškumo įvertinti nepavyko – nuotraukoje per mažai detalių (lygūs plotai).' });
-    else if (m.sharp < cfg.sharp.veryBlurry) reasons.push({ tone: 'bad', text: `Labai neryški (detalumas ${Math.round(m.sharp)})` + (dpiEff != null ? ` – efektyvi skiriamoji geba laikoma perpus mažesnė${eff}.` : '.') });
-    else if (m.sharp < cfg.sharp.blurry) reasons.push({ tone: 'warn', text: `Neryški (detalumas ${Math.round(m.sharp)})` + (dpiEff != null ? ` – efektyvi skiriamoji geba sumažinta${eff}.` : '.') });
-    else reasons.push({ tone: 'ok', text: `Ryškumas ${m.sharp >= cfg.sharp.sharp ? 'geras' : 'vidutinis'} (detalumas ${Math.round(m.sharp)}).` });
+    else if (m.sharp < cfg.sharp.veryBlurry) reasons.push({ tone: 'bad', text: `Aštrumas: Prasta` + (dpiEff != null ? ` – efektyvi skiriamoji geba laikoma perpus mažesnė${eff}.` : '.') });
+    else if (m.sharp < cfg.sharp.blurry) reasons.push({ tone: 'warn', text: `Aštrumas: Ribinė` + (dpiEff != null ? ` – efektyvi skiriamoji geba sumažinta${eff}.` : '.') });
+    else reasons.push({ tone: 'ok', text: `Aštrumas ir detalumas: ${humanLevel(m.sharp, [cfg.sharp.sharp, cfg.sharp.blurry * 1.4, cfg.sharp.blurry, cfg.sharp.veryBlurry])}.` });
 
     if (m.noise != null) {
-      if (m.noise >= cfg.noise.high) { pen += 1; reasons.push({ tone: 'warn', text: `Didelis triukšmas (σ ${fmt1(m.noise)}) – ant popieriaus matysis grūdėtumas.` }); }
-      else reasons.push({ tone: 'ok', text: `Triukšmas ${m.noise >= cfg.noise.moderate ? 'vidutinis' : 'mažas'} (σ ${fmt1(m.noise)}).` });
+      if (m.noise >= cfg.noise.high) { pen += 1; reasons.push({ tone: 'warn', text: `Triukšmas: Prasta – ant spaudinio gali matytis grūdėtumas.` }); }
+      else reasons.push({ tone: 'ok', text: `Triukšmo lygis: ${m.noise >= cfg.noise.moderate ? 'Tinka' : 'Gera'}.` });
     }
     const e = m.exposure;
     if (e) {
@@ -174,8 +175,8 @@ function imageFindings(m, a, cfg, dpiEff) {
       if (e.bright >= cfg.exposure.brightClipBad) txt.push(`išdegę šviesūs plotai (${fmt1(e.bright)} %)`);
       if (e.mean <= cfg.exposure.darkMean) txt.push('labai tamsi');
       if (e.mean >= cfg.exposure.brightMean) txt.push('labai šviesi');
-      if (txt.length) { pen += 1; reasons.push({ tone: 'warn', text: 'Ekspozicija: ' + txt.join(', ') + '.' }); }
-      else reasons.push({ tone: 'ok', text: `Ekspozicija normali (vidurkis ${Math.round(e.mean)}).` });
+      if (txt.length) { pen += 1; reasons.push({ tone: 'warn', text: 'Ekspozicija: ' + (e.bright >= cfg.exposure.brightClipBad * 1.5 || e.mean <= cfg.exposure.darkMean * .8 || e.mean >= cfg.exposure.brightMean * 1.08 ? 'Prasta' : 'Ribinė') + ' (' + txt.join(', ') + ').' }); }
+      else reasons.push({ tone: 'ok', text: `Ekspozicija: Gera.` });
     }
   }
   if (a) {
@@ -183,10 +184,9 @@ function imageFindings(m, a, cfg, dpiEff) {
     const sharpAlready = m && m.sharp != null && m.sharp < cfg.sharp.blurry;
     const noiseAlready = m && m.noise != null && m.noise >= cfg.noise.high;
     let aiPen = 0;
-    if (a.sharp < bad && !sharpAlready) { aiPen = 1; reasons.push({ tone: 'warn', text: `AI mato neryškų vaizdą (ryškumas ${Math.round(a.sharp * 100)} %).` }); }
-    if (a.clean < bad && !noiseAlready) { aiPen = 1; reasons.push({ tone: 'warn', text: `AI mato triukšmą (švara ${Math.round(a.clean * 100)} %).` }); }
-    if (a.quality < bad) { aiPen = 1; reasons.push({ tone: 'warn', text: `AI bendrą kokybę vertina žemai (${Math.round(a.quality * 100)} %).` }); }
-    if (!aiPen) reasons.push({ tone: 'ok', text: `AI antra nuomonė nepriekaištų nerado (kokybė ${Math.round(a.quality * 100)} %, ryškumas ${Math.round(a.sharp * 100)} %).` });
+    if (a.sharp < bad && !sharpAlready) aiPen = 1;
+    if (a.clean < bad && !noiseAlready) aiPen = 1;
+    if (a.quality < bad) aiPen = 1;
     pen += aiPen;
   }
   return { reasons, pen };
@@ -202,7 +202,7 @@ export function evaluate(o, cfg) {
   const pr = cfg.printers[printer], dCm = viewingCm(o.cmW, o.cmH, cfg);
   const reasons = [{
     tone: resLevel >= 4 ? 'ok' : resLevel === 3 ? 'warn' : 'bad',
-    text: `Efektyvus ${Math.round(o.dpi)} dpi. ${pr.name}, žiūrima ~${Math.round(dCm)} cm atstumu: gerai kokybei reikia ≥ ${Math.round(R * f.gera)} dpi, puikiai ≥ ${Math.round(R * f.puiki)} dpi.`,
+    text: `Numatomas žiūrėjimo atstumas ${Math.round(dCm)} cm, gerai kokybei reikia bent ≥ ${Math.round(R * f.gera)} dpi.`,
   }];
   const found = imageFindings(o.metrics, o.ai, cfg, dpiEff);
   reasons.push(...found.reasons);
