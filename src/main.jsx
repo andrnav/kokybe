@@ -8,7 +8,7 @@ import * as UTIF from 'utif';
 import QualityTab from './quality/QualityTab.jsx';
 import { useQuality } from './quality/useQuality.js';
 import { evaluate } from './quality/engine.js';
-import { Camera, ImagePlus, Download, RotateCcw, RotateCw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2 } from 'lucide-react';
+import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2 } from 'lucide-react';
 import './style.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -315,54 +315,6 @@ function App() {
   const setZoomValue = value => patchActive({ zoom: clamp(value, 1, selectedMode === 'fit' || selectedMode === 'free' ? 4 : 3) });
   const reset = () => { setZoom(1); setPan({ x: 0, y: 0 }); patchActive({ zoom: 1, pan: { x: 0, y: 0 }, orientation: 'auto' }); };
   const setOrientation = value => patchActive({ orientation: value });
-  const rotateActiveTo = async targetAngle => {
-    if (!active || busy) return;
-    const nextAngle = Math.max(-10, Math.min(10, Math.round(Number(targetAngle) * 10) / 10));
-    const currentAngle = Number(active.rotation || 0);
-    const delta = nextAngle - currentAngle;
-    if (Math.abs(delta) < 0.001) return;
-    setBusy(true);
-    try {
-      // Rotation is baked into the image pixels so preview, crop, thumbnails and export
-      // all use the same corrected image rather than a CSS-only transform.
-      const radians = delta * Math.PI / 180;
-      const cos = Math.abs(Math.cos(radians));
-      const sin = Math.abs(Math.sin(radians));
-      const width = Math.ceil(active.width * cos + active.height * sin);
-      const height = Math.ceil(active.width * sin + active.height * cos);
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Nepavyko paruošti nuotraukos pasukimui.');
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, width, height);
-      ctx.translate(width / 2, height / 2);
-      ctx.rotate(radians);
-      ctx.drawImage(active.image, -active.width / 2, -active.height / 2);
-      const blob = await new Promise((resolve, reject) => canvas.toBlob(
-        value => value ? resolve(value) : reject(new Error('Nepavyko pasukti nuotraukos.')),
-        'image/png'
-      ));
-      const rotated = await blobToImage(blob);
-      const oldUrl = active.url;
-      patchActive({
-        ...rotated,
-        rotation: nextAngle,
-        zoom: 1,
-        pan: { x: 0, y: 0 },
-        freeCrop: { x: 0, y: 0, w: rotated.width, h: rotated.height },
-      });
-      setZoom(1);
-      setPan({ x: 0, y: 0 });
-      if (oldUrl?.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
-      setMessage(`Horizontas pakoreguotas ${nextAngle > 0 ? '+' : ''}${nextAngle.toFixed(1)}°.`);
-    } catch (error) {
-      setMessage(error.message || 'Nepavyko pakoreguoti horizonto.');
-    } finally {
-      setBusy(false);
-    }
-  };
   const navigateTo = id => {
     if (active && active.status !== 'done') updatePhoto(active.id, { status: 'done' });
     setActiveId(id);
@@ -421,7 +373,7 @@ function App() {
           for (const page of pages) {
             added.push({
               id: uid(), originalFile: file, ...page,
-              status: 'new', orientation: 'auto', rotation: 0, cutLine: false, zoom: 1, pan: { x: 0, y: 0 },
+              status: 'new', orientation: 'auto', cutLine: false, zoom: 1, pan: { x: 0, y: 0 },
               freeCrop: { x: 0, y: 0, w: page.width, h: page.height },
               copies: 1, mode, format, customCm,
             });
@@ -430,7 +382,7 @@ function App() {
           const decoded = await decodeFile(file);
           added.push({
             id: uid(), name: file.name, originalFile: file, ...decoded,
-            status: 'new', orientation: 'auto', rotation: 0, cutLine: false, zoom: 1, pan: { x: 0, y: 0 },
+            status: 'new', orientation: 'auto', cutLine: false, zoom: 1, pan: { x: 0, y: 0 },
             freeCrop: { x: 0, y: 0, w: decoded.width, h: decoded.height },
             copies: 1, mode, format, customCm,
           });
@@ -461,8 +413,43 @@ function App() {
     return blob;
   };
 
+  // 1 px pjovimo kontūras įrašomas į galutinį failą tik tada, kai
+  // konkrečiai nuotraukai įjungta parinktis. Peržiūros sluoksnio jis nekeičia.
+  const drawExportCutLine = (photo, canvas) => {
+    if (!photo.cutLine || canvas.width < 2 || canvas.height < 2) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.save();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1;
+    if (photo.mode === 'fit') {
+      const target = getTargetRatio(photo);
+      const sheetW = Math.max(photo.width, Math.ceil(photo.height * target));
+      const sheetH = Math.max(photo.height, Math.ceil(photo.width / target));
+      const fitScale = Math.min(sheetW / photo.width, sheetH / photo.height);
+      const z = clamp(Number(photo.zoom || 1), 1, 4);
+      const drawW = photo.width * fitScale * z;
+      const drawH = photo.height * fitScale * z;
+      const maxX = Math.max(0, (drawW - sheetW) / 2);
+      const maxY = Math.max(0, (drawH - sheetH) / 2);
+      const px = clamp(Number(photo.pan?.x || 0), -1, 1) * maxX;
+      const py = clamp(Number(photo.pan?.y || 0), -1, 1) * maxY;
+      const x = (sheetW - drawW) / 2 + px;
+      const y = (sheetH - drawH) / 2 + py;
+      // The canvas clips the outline naturally if the zoomed image reaches
+      // beyond the sheet edge.
+      ctx.strokeRect(Math.round(x) + 0.5, Math.round(y) + 0.5,
+        Math.max(0, Math.round(drawW) - 1), Math.max(0, Math.round(drawH) - 1));
+    } else {
+      // Crop/real/free outputs contain only the final image area.
+      ctx.strokeRect(0.5, 0.5, canvas.width - 1, canvas.height - 1);
+    }
+    ctx.restore();
+  };
+
   const exportOne = async photo => {
     const canvas = document.createElement('canvas'); renderPhoto(photo, canvas, { realDpi });
+    drawExportCutLine(photo, canvas);
     let blob, extension;
     if (exportFormat === 'tif') {
       const ctx = canvas.getContext('2d');
@@ -502,7 +489,7 @@ function App() {
     const liveIds = new Set(photos.map(p => p.id));
     for (const id of cache.keys()) if (!liveIds.has(id)) cache.delete(id);
     photos.forEach(p => {
-      const signature = JSON.stringify([p.mode, p.format, p.customCm, p.orientation, p.rotation, p.width, p.height, p.zoom, p.pan, p.freeCrop]);
+      const signature = JSON.stringify([p.mode, p.format, p.customCm, p.orientation, p.zoom, p.pan, p.freeCrop]);
       const cached = cache.get(p.id);
       if (cached?.signature === signature) { result.set(p.id, cached.src); return; }
       try {
@@ -599,7 +586,6 @@ function App() {
       {active ? <>
         <div className={`print-sheet mode-${selectedMode}`} style={sheetStyle}>
           <img className="stage-photo" src={active.url} style={imageStyle} draggable="false" />
-          {active.cutLine && <div className={`cut-line-overlay ${selectedMode === 'fit' ? 'fit-cut-line' : ''}`} style={selectedMode === 'fit' ? imageStyle : undefined} aria-hidden="true" />}
           {selectedMode !== 'fit' && <div className="crop-shade" aria-hidden="true" />}{selectedMode === 'free' && <button className="free-resize-handle" aria-label="Keisti laisvo kadravimo dydį" onPointerDown={beginFreeResize} onClick={e => e.stopPropagation()} />}
         </div>
         <div className="stage-hint"><Move size={14}/> {selectedMode === 'fit' ? 'Vilkite nuotrauką ir priartinkite, kad sumažintumėte baltus kraštus' : selectedMode === 'free' ? 'Vilkite nuotrauką pozicijai keisti, tempkite apatinį dešinį kampą kadrui keisti' : 'Vilkite nuotrauką norėdami pakeisti jos poziciją'}</div>
@@ -617,7 +603,7 @@ function App() {
         <div className="section-divider"/><div className="panel-title">2. Kadravimo tipas</div><div className="mode-list"><button className={selectedMode === 'crop' ? 'mode selected' : 'mode'} onClick={() => { setMode('crop'); if (active) patchActive({ mode: 'crop' }); }}><Crop/><span>Kadravimas</span></button><button className={selectedMode === 'fit' ? 'mode selected' : 'mode'} onClick={() => { setMode('fit'); if (active) patchActive({ mode: 'fit' }); }}><Square/><span>Įtalpinta</span></button><button className={selectedMode === 'real' ? 'mode selected' : 'mode'} onClick={() => { setMode('real'); if (active) patchActive({ mode: 'real' }); }}><Ruler/><span>Real Size</span></button><button className={selectedMode === 'free' ? 'mode selected' : 'mode'} onClick={() => { setMode('free'); if (active) patchActive({ mode: 'free', zoom: 1, pan: { x: 0, y: 0 }, freeCrop: { x: 0, y: 0, w: active.width, h: active.height } }); }}><Crop/><span>Laisvas</span></button></div><button className="apply-all-button" onClick={() => applyModeToAll(selectedMode)} disabled={!photos.length}>Taikyti visoms nuotraukoms</button>
         <div className="section-divider"/><div className="panel-title">3. Eksportas</div><div className="select-wrap"><select value={exportFormat} onChange={e => setExportFormat(e.target.value)}><option value="jpg">JPG</option><option value="tif">TIFF · 8 bitų · Lossless</option></select></div></aside>
       <section className="editor-column"><div className="editor-toolbar"><div className="photo-title-group"><div className="photo-name">{active?.name || 'Nuotrauka nepasirinkta'}</div>{selectedMode === 'real' && <div className="real-dpi-picker" role="group" aria-label="Eksporto raiška"><span>DPI</span><button className={realDpi === 320 ? 'active' : ''} onClick={() => setRealDpi(320)}>320</button><button className={realDpi === 300 ? 'active' : ''} onClick={() => setRealDpi(300)}>300</button></div>}<div className="image-metrics toolbar-metrics">{metrics && <><span><b>{metrics.widthPx.toLocaleString('lt-LT')} × {metrics.heightPx.toLocaleString('lt-LT')} px</b></span><span>{metrics.size}</span><span><b>{metrics.dpi}</b></span><span className={`quality-indicator ${metrics.qualityClass}`} title={metrics.targetDpi ? `Tikslas: ${metrics.targetDpi} DPI` : 'Laisvam formatui kokybė pagal spaudos dydį neskaičiuojama'}>Kokybė: <b>{metrics.quality}</b></span></>}</div></div><div className="editor-nav"><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i > 0) navigateTo(photos[i - 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === 0}><ChevronLeft size={17}/> Ankstesnė</button><span>{active ? `${photos.findIndex(p => p.id === activeId) + 1} iš ${photos.length}` : '0 iš 0'}</span><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i < photos.length - 1) navigateTo(photos[i + 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === photos.length - 1}>Kita <ChevronRight size={17}/></button></div></div>
-        {renderStage()}<div className="editor-footer"><div className="editor-tools-group"><div className="orientation-control"><span>Orientacija</span><div className="segmented"><button className={selectedOrientation === 'auto' ? 'active' : ''} onClick={() => patchActive({ orientation: 'auto' })}>Automatinė</button><button className={selectedOrientation === 'vertical' ? 'active' : ''} onClick={() => patchActive({ orientation: 'vertical' })}>Vertikali</button><button className={selectedOrientation === 'horizontal' ? 'active' : ''} onClick={() => patchActive({ orientation: 'horizontal' })}>Horizontali</button></div></div><div className="editor-extra-tools horizon-tools"><span>Horizonto korekcija</span><div className="editor-tool-buttons horizon-controls"><button className="secondary icon-tool" onClick={() => rotateActiveTo((Number(active?.rotation || 0) - 0.1).toFixed(1))} disabled={!active || busy || Number(active?.rotation || 0) <= -10} title="Sukti 0,1° prieš laikrodžio rodyklę" aria-label="Sukti 0,1 laipsnio prieš laikrodžio rodyklę">−</button><input className="horizon-slider" type="range" min="-10" max="10" step="0.1" value={Number(active?.rotation || 0)} disabled={!active || busy} onChange={e => rotateActiveTo(e.target.value)} aria-label="Horizonto korekcija"/><button className="secondary icon-tool" onClick={() => rotateActiveTo((Number(active?.rotation || 0) + 0.1).toFixed(1))} disabled={!active || busy || Number(active?.rotation || 0) >= 10} title="Sukti 0,1° pagal laikrodžio rodyklę" aria-label="Sukti 0,1 laipsnio pagal laikrodžio rodyklę">+</button><output className="horizon-value">{Number(active?.rotation || 0).toFixed(1)}°</output><label className="cut-line-toggle"><input type="checkbox" checked={!!active?.cutLine} disabled={!active} onChange={e => patchActive({ cutLine: e.target.checked })}/><span>Pjovimo linija</span></label></div></div></div><div className="footer-actions"><button className="secondary" onClick={reset} disabled={!active}><RotateCcw size={16}/> Atstatyti</button><button className="secondary" onClick={exportCurrent} disabled={!active}><Download size={16}/> Atsisiųsti šią nuotrauką</button></div></div></section>
+        {renderStage()}<div className="editor-footer"><div className="orientation-control"><span>Orientacija</span><div className="segmented"><button className={selectedOrientation === 'auto' ? 'active' : ''} onClick={() => patchActive({ orientation: 'auto' })}>Automatinė</button><button className={selectedOrientation === 'vertical' ? 'active' : ''} onClick={() => patchActive({ orientation: 'vertical' })}>Vertikali</button><button className={selectedOrientation === 'horizontal' ? 'active' : ''} onClick={() => patchActive({ orientation: 'horizontal' })}>Horizontali</button></div></div><label className="export-cutline-toggle"><input type="checkbox" checked={!!active?.cutLine} disabled={!active || busy} onChange={e => patchActive({ cutLine: e.target.checked })}/><span>Pjovimo linija faile (1 px)</span></label><div className="footer-actions"><button className="secondary" onClick={reset} disabled={!active}><RotateCcw size={16}/> Atstatyti</button><button className="secondary" onClick={exportCurrent} disabled={!active}><Download size={16}/> Atsisiųsti šią nuotrauką</button></div></div></section>
     </main>
     {tab === 'quality' && <QualityTab photos={photos} thumbs={thumbSources} getPrint={p => getPhotoPrint(p, realDpi)} quality={quality} activeId={activeId} appMessage={message} onOpen={id => { setTab('crop'); if (id !== activeId) navigateTo(id); }} />}
     <section className={`filmstrip ${dropZone === 'strip' ? 'drag-over' : ''}`} style={tab === 'crop' ? undefined : { display: 'none' }}
