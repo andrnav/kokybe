@@ -133,3 +133,12 @@ Skirsnis „Nuotraukos kokybė“ nebėra išjungtas. Jame kiekviena nuotrauka v
 - Laisvo kadravimo rėmelį galima perkelti tempiant jį pele; rėmelio pozicija apribojama nuotraukos ribomis.
 - Laisvo kadravimo dydžio keitimo rankenėlė išlieka apatiniame dešiniajame kampe.
 - Miniatiūrų kopijų valdiklių tvarka pakeista į `+`, skaičius, `−`.
+
+
+## v2.1.6 – Real Size DPI pasirinkimas
+
+- „Real Size“ režime virš nuotraukos galima pasirinkti 320 DPI (numatytasis) arba 300 DPI.
+- Eksportuojamo JPG failo pikselių matmenys apskaičiuojami pagal pasirinktą fizinį formatą ir DPI.
+- JPG JFIF metaduomenyse įrašomas pasirinktas DPI.
+- Kiti kadravimo režimai nepakeisti.
+- Pašalintas fiksuotas „320 DPI“ užrašas iš „Real Size“ mygtuko.

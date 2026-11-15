@@ -170,7 +170,7 @@ function getCrop(photo) {
   return { sx: cx - sw / 2, sy: cy - sh / 2, sw, sh, baseW, baseH, target };
 }
 // Fizinis spaudinio dydis ir efektyvi šaltinio raiška. Naudojama kadravimo įrankių juostoje ir skirsnyje „Nuotraukos kokybė“.
-function getPhotoPrint(photo) {
+function getPhotoPrint(photo, realDpi = 320) {
   const mode = photo.mode || 'crop';
   const crop = getCrop(photo);
   const sourceWidthPx = Math.max(1, Math.round(crop.sw));
@@ -182,9 +182,9 @@ function getPhotoPrint(photo) {
   const wCm = portrait ? a : b, hCm = portrait ? b : a;
   let dpiX, dpiY;
   if (mode === 'real') {
-    // Export is resampled to 320 DPI, but quality must reflect source pixels before upscaling.
+    // Galutinis failas kuriamas pasirinktu DPI; kokybė vertinama pagal šaltinio pikselius prieš didinimą.
     dpiX = crop.sw / (wCm / 2.54); dpiY = crop.sh / (hCm / 2.54);
-    widthPx = Math.round(wCm / 2.54 * 320); heightPx = Math.round(hCm / 2.54 * 320);
+    widthPx = Math.round(wCm / 2.54 * realDpi); heightPx = Math.round(hCm / 2.54 * realDpi);
   } else if (mode === 'fit') {
     const target = getTargetRatio(photo);
     widthPx = Math.max(photo.width, Math.ceil(photo.height * target)); heightPx = Math.max(photo.height, Math.ceil(photo.width / target));
@@ -196,7 +196,7 @@ function getPhotoPrint(photo) {
   }
   return { free: false, mode, wCm, hCm, widthPx, heightPx, sourceWidthPx, sourceHeightPx, dpiX, dpiY, effDpi: Math.min(dpiX, dpiY) };
 }
-function renderPhoto(photo, canvas, { thumbnail = false } = {}) {
+function renderPhoto(photo, canvas, { thumbnail = false, realDpi = 320 } = {}) {
   const fmt = getFormat(photo);
   const portrait = getOrientation(photo);
   const [a, b] = fmt.cm;
@@ -204,8 +204,8 @@ function renderPhoto(photo, canvas, { thumbnail = false } = {}) {
   const ctx = canvas.getContext('2d');
   if (photo.mode === 'real') {
     const wCm = portrait ? a : b, hCm = portrait ? b : a;
-    canvas.width = Math.round(wCm / 2.54 * 320);
-    canvas.height = Math.round(hCm / 2.54 * 320);
+    canvas.width = Math.round(wCm / 2.54 * realDpi);
+    canvas.height = Math.round(hCm / 2.54 * realDpi);
   } else if (photo.mode === 'fit') {
     // Tikslus pasirinkto formato baltas lapas; nuotrauką galima priartinti ir pastumti.
     const sheetW = Math.max(photo.width, Math.ceil(photo.height * target));
@@ -252,6 +252,7 @@ function App() {
   const [format, setFormat] = useState('10x15');
   const [customCm, setCustomCm] = useState([10, 15]);
   const [mode, setMode] = useState('crop');
+  const [realDpi, setRealDpi] = useState(320);
   const [exportFormat, setExportFormat] = useState('jpg');
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -399,8 +400,21 @@ function App() {
     setMessage(failed.length ? `${summary} Nepavyko: ${failed.join(' | ')}` : summary);
   };
 
+  const setJpegDpiMetadata = async (blob, dpi) => {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    // Canvas JPEG usually starts with a JFIF APP0 segment. Set its density unit to inches.
+    if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff && bytes[3] === 0xe0 &&
+        bytes[6] === 0x4a && bytes[7] === 0x46 && bytes[8] === 0x49 && bytes[9] === 0x46) {
+      bytes[13] = 1;
+      bytes[14] = (dpi >> 8) & 255; bytes[15] = dpi & 255;
+      bytes[16] = (dpi >> 8) & 255; bytes[17] = dpi & 255;
+      return new Blob([bytes], { type: 'image/jpeg' });
+    }
+    return blob;
+  };
+
   const exportOne = async photo => {
-    const canvas = document.createElement('canvas'); renderPhoto(photo, canvas);
+    const canvas = document.createElement('canvas'); renderPhoto(photo, canvas, { realDpi });
     let blob, extension;
     if (exportFormat === 'tif') {
       const ctx = canvas.getContext('2d');
@@ -410,6 +424,7 @@ function App() {
       extension = 'tif';
     } else {
       blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.98));
+      if (photo.mode === 'real') blob = await setJpegDpiMetadata(blob, realDpi);
       extension = 'jpg';
     }
     if (!blob) throw new Error(`${extension.toUpperCase()} eksportas nepavyko`);
@@ -453,7 +468,7 @@ function App() {
   }, [photos]);
 
   const metrics = active ? (() => {
-    const print = getPhotoPrint(active);
+    const print = getPhotoPrint(active, realDpi);
     const { widthPx, heightPx } = print;
     if (print.free) return { widthPx, heightPx, size: 'Laisvas formatas', dpi: '—', quality: 'Nevertinama', qualityClass: 'neutral', targetDpi: null };
     const { wCm, hCm, dpiX, dpiY } = print;
@@ -550,12 +565,12 @@ function App() {
     <main className="workspace" style={tab === 'crop' ? undefined : { display: 'none' }}>
       <aside className="left-panel"><div className="panel-title">1. Spausdinimo formatas</div><div className="select-wrap format-select"><select value={currentFormatId} disabled={selectedMode === 'free'} onChange={e => changeFormat(e.target.value)}>{FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}<option value="custom">Pagal skaičius</option></select></div>
         <div className="custom-format"><div className="custom-format-title">Rankinis formatas</div><div className="custom-format-fields"><input disabled={selectedMode === "free"} aria-label="Pirmas matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[0]} onChange={e => changeCustom(0, e.target.value)}/><span>×</span><input disabled={selectedMode === "free"} aria-label="Antras matmuo centimetrais" type="number" min="0.1" max="300" step="0.1" value={customCm[1]} onChange={e => changeCustom(1, e.target.value)}/></div></div>
-        <div className="section-divider"/><div className="panel-title">2. Kadravimo tipas</div><div className="mode-list"><button className={selectedMode === 'crop' ? 'mode selected' : 'mode'} onClick={() => { setMode('crop'); if (active) patchActive({ mode: 'crop' }); }}><Crop/><span>Kadravimas</span></button><button className={selectedMode === 'fit' ? 'mode selected' : 'mode'} onClick={() => { setMode('fit'); if (active) patchActive({ mode: 'fit' }); }}><Square/><span>Įtalpinta</span></button><button className={selectedMode === 'real' ? 'mode selected' : 'mode'} onClick={() => { setMode('real'); if (active) patchActive({ mode: 'real' }); }}><Ruler/><span>Real Size<small>320 DPI</small></span></button><button className={selectedMode === 'free' ? 'mode selected' : 'mode'} onClick={() => { setMode('free'); if (active) patchActive({ mode: 'free', zoom: 1, pan: { x: 0, y: 0 }, freeCrop: { x: 0, y: 0, w: active.width, h: active.height } }); }}><Crop/><span>Laisvas</span></button></div><button className="apply-all-button" onClick={() => applyModeToAll(selectedMode)} disabled={!photos.length}>Taikyti visoms nuotraukoms</button>
+        <div className="section-divider"/><div className="panel-title">2. Kadravimo tipas</div><div className="mode-list"><button className={selectedMode === 'crop' ? 'mode selected' : 'mode'} onClick={() => { setMode('crop'); if (active) patchActive({ mode: 'crop' }); }}><Crop/><span>Kadravimas</span></button><button className={selectedMode === 'fit' ? 'mode selected' : 'mode'} onClick={() => { setMode('fit'); if (active) patchActive({ mode: 'fit' }); }}><Square/><span>Įtalpinta</span></button><button className={selectedMode === 'real' ? 'mode selected' : 'mode'} onClick={() => { setMode('real'); if (active) patchActive({ mode: 'real' }); }}><Ruler/><span>Real Size</span></button><button className={selectedMode === 'free' ? 'mode selected' : 'mode'} onClick={() => { setMode('free'); if (active) patchActive({ mode: 'free', zoom: 1, pan: { x: 0, y: 0 }, freeCrop: { x: 0, y: 0, w: active.width, h: active.height } }); }}><Crop/><span>Laisvas</span></button></div><button className="apply-all-button" onClick={() => applyModeToAll(selectedMode)} disabled={!photos.length}>Taikyti visoms nuotraukoms</button>
         <div className="section-divider"/><div className="panel-title">3. Eksportas</div><div className="select-wrap"><select value={exportFormat} onChange={e => setExportFormat(e.target.value)}><option value="jpg">JPG</option><option value="tif">TIFF · 8 bitų · Lossless</option></select></div></aside>
-      <section className="editor-column"><div className="editor-toolbar"><div className="photo-title-group"><div className="photo-name">{active?.name || 'Nuotrauka nepasirinkta'}</div><div className="image-metrics toolbar-metrics">{metrics && <><span><b>{metrics.widthPx.toLocaleString('lt-LT')} × {metrics.heightPx.toLocaleString('lt-LT')} px</b></span><span>{metrics.size}</span><span><b>{metrics.dpi}</b></span><span className={`quality-indicator ${metrics.qualityClass}`} title={metrics.targetDpi ? `Tikslas: ${metrics.targetDpi} DPI` : 'Laisvam formatui kokybė pagal spaudos dydį neskaičiuojama'}>Kokybė: <b>{metrics.quality}</b></span></>}</div></div><div className="editor-nav"><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i > 0) navigateTo(photos[i - 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === 0}><ChevronLeft size={17}/> Ankstesnė</button><span>{active ? `${photos.findIndex(p => p.id === activeId) + 1} iš ${photos.length}` : '0 iš 0'}</span><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i < photos.length - 1) navigateTo(photos[i + 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === photos.length - 1}>Kita <ChevronRight size={17}/></button></div></div>
+      <section className="editor-column"><div className="editor-toolbar"><div className="photo-title-group"><div className="photo-name">{active?.name || 'Nuotrauka nepasirinkta'}</div>{selectedMode === 'real' && <div className="real-dpi-picker" role="group" aria-label="Eksporto raiška"><span>DPI</span><button className={realDpi === 320 ? 'active' : ''} onClick={() => setRealDpi(320)}>320</button><button className={realDpi === 300 ? 'active' : ''} onClick={() => setRealDpi(300)}>300</button></div>}<div className="image-metrics toolbar-metrics">{metrics && <><span><b>{metrics.widthPx.toLocaleString('lt-LT')} × {metrics.heightPx.toLocaleString('lt-LT')} px</b></span><span>{metrics.size}</span><span><b>{metrics.dpi}</b></span><span className={`quality-indicator ${metrics.qualityClass}`} title={metrics.targetDpi ? `Tikslas: ${metrics.targetDpi} DPI` : 'Laisvam formatui kokybė pagal spaudos dydį neskaičiuojama'}>Kokybė: <b>{metrics.quality}</b></span></>}</div></div><div className="editor-nav"><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i > 0) navigateTo(photos[i - 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === 0}><ChevronLeft size={17}/> Ankstesnė</button><span>{active ? `${photos.findIndex(p => p.id === activeId) + 1} iš ${photos.length}` : '0 iš 0'}</span><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i < photos.length - 1) navigateTo(photos[i + 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === photos.length - 1}>Kita <ChevronRight size={17}/></button></div></div>
         {renderStage()}<div className="editor-footer"><div className="orientation-control"><span>Orientacija</span><div className="segmented"><button className={selectedOrientation === 'auto' ? 'active' : ''} onClick={() => patchActive({ orientation: 'auto' })}>Automatinė</button><button className={selectedOrientation === 'vertical' ? 'active' : ''} onClick={() => patchActive({ orientation: 'vertical' })}>Vertikali</button><button className={selectedOrientation === 'horizontal' ? 'active' : ''} onClick={() => patchActive({ orientation: 'horizontal' })}>Horizontali</button></div></div><div className="footer-actions"><button className="secondary" onClick={reset} disabled={!active}><RotateCcw size={16}/> Atstatyti</button><button className="secondary" onClick={exportCurrent} disabled={!active}><Download size={16}/> Atsisiųsti šią nuotrauką</button></div></div></section>
     </main>
-    {tab === 'quality' && <QualityTab photos={photos} thumbs={thumbSources} getPrint={getPhotoPrint} quality={quality} activeId={activeId} appMessage={message} onOpen={id => { setTab('crop'); if (id !== activeId) navigateTo(id); }} />}
+    {tab === 'quality' && <QualityTab photos={photos} thumbs={thumbSources} getPrint={p => getPhotoPrint(p, realDpi)} quality={quality} activeId={activeId} appMessage={message} onOpen={id => { setTab('crop'); if (id !== activeId) navigateTo(id); }} />}
     <section className={`filmstrip ${dropZone === 'strip' ? 'drag-over' : ''}`} style={tab === 'crop' ? undefined : { display: 'none' }}
       onDragEnter={e => { e.preventDefault(); setDropZone('strip'); }}
       onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
