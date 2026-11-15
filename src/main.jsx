@@ -7,7 +7,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import * as UTIF from 'utif';
 import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2 } from 'lucide-react';
 import './style.css';
-import { analyzePhoto } from './quality/analyze.js';
+import { analyzePhoto, createQualityCropBlob } from './quality/analyze.js';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -252,6 +252,9 @@ function App() {
   const [qualityReport, setQualityReport] = useState(null);
   const [qualityBusy, setQualityBusy] = useState(false);
   const [qualityError, setQualityError] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiError, setAiError] = useState('');
   const [dragging, setDragging] = useState(false);
   const [dragStart, setDragStart] = useState(null);
   const [resizeStart, setResizeStart] = useState(null);
@@ -275,6 +278,8 @@ function App() {
     let cancelled = false;
     setQualityBusy(true);
     setQualityError('');
+    setAiResult(null);
+    setAiError('');
     try {
       const fmt = getFormat(active);
       const targetDpi = getTargetDpi(Math.max(...fmt.cm), qualityScale);
@@ -295,6 +300,25 @@ function App() {
     const ro = new ResizeObserver(update); ro.observe(node); update();
     return () => ro.disconnect();
   }, [!!active]);
+
+  const runAiQuality = async () => {
+    if (!active) return;
+    setAiBusy(true); setAiError(''); setAiResult(null);
+    try {
+      const fmt = getFormat(active);
+      const blob = await createQualityCropBlob(active, { format: fmt, mode: active.mode || 'crop', getCrop, getOrientation, getTargetRatio });
+      const body = new FormData();
+      body.append('image', blob, 'print-crop.jpg');
+      body.append('print_width_cm', String(Math.max(...fmt.cm)));
+      const response = await fetch('http://127.0.0.1:8765/analyze', { method: 'POST', body });
+      if (!response.ok) throw new Error(`Vietinis AI servisas grąžino klaidą (${response.status}).`);
+      const result = await response.json();
+      if (!result || typeof result.score !== 'number') throw new Error('AI servisas grąžino netinkamą atsakymą.');
+      setAiResult(result);
+    } catch (error) {
+      setAiError(error?.message || 'Nepavyko atlikti AI vertinimo. Patikrinkite, ar paleistas vietinis AI servisas.');
+    } finally { setAiBusy(false); }
+  };
 
   const updatePhoto = (id, patch) => setPhotos(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p));
   const deletePhoto = id => {
@@ -577,7 +601,7 @@ function App() {
           <div className="quality-summary-grid"><div className="quality-summary-card"><span>Numatomas spausdintuvas</span><b>{qualityReport.printer}</b><small>{qualityReport.printer.includes('Noritsu') ? 'Spaudinio plotis iki 30,5 cm' : 'Spaudinio plotis virš 30,5 cm'}</small></div><div className="quality-summary-card"><span>Efektyvi raiška po kadravimo</span><b>{qualityReport.dpi} DPI</b><small>Rekomenduojama pagal dydį: {qualityReport.targetDpi} DPI</small></div><div className="quality-summary-card"><span>Pasirinktas spaudos formatas</span><b>{qualityReport.printSize}</b><small>{qualityReport.viewing}</small></div></div>
           <section className="quality-findings"><div className="quality-section-title"><div><h2>Ką parodė analizė?</h2><p>Žmogiška išvada apie svarbiausius spaudos kokybės požymius.</p></div><span className="analysis-label">MATEMATINĖ ANALIZĖ</span></div>{qualityReport.findings.map((item, i) => <div className={`finding-item ${item.level}`} key={`${item.title}-${i}`}><span className="finding-icon">{item.level === 'good' ? '✓' : item.level === 'bad' ? '!' : item.level === 'warning' ? '⚠' : 'i'}</span><div><b>{item.title}</b><p>{item.text}</p></div></div>)}</section>
           <section className="quality-findings"><div className="quality-section-title"><div><h2>Vaizdo savybės</h2><p>Techniniai matavimai paversti suprantamais apibūdinimais.</p></div></div><div className="quality-property-grid"><div><span>Aštrumas</span><b>{qualityReport.metrics.sharpness < 45 ? 'Silpnas' : qualityReport.metrics.sharpness < 115 ? 'Vidutinis' : 'Geras'}</b></div><div><span>Kontrastas</span><b>{qualityReport.metrics.contrast < 55 ? 'Žemas' : qualityReport.metrics.contrast < 105 ? 'Vidutinis' : 'Geras'}</b></div><div><span>Triukšmas</span><b>{qualityReport.metrics.noise > 13 ? 'Pastebimas' : qualityReport.metrics.noise > 7 ? 'Nedidelis' : 'Mažas'}</b></div><div><span>Spalvų balansas</span><b>{qualityReport.metrics.colorCast > 16 ? 'Galimas atspalvio poslinkis' : 'Ryškaus poslinkio nėra'}</b></div><div><span>Šviesios detalės</span><b>{qualityReport.metrics.highlights > 2 ? 'Dalis prarasta' : 'Išsaugotos'}</b></div><div><span>Tamsios detalės</span><b>{qualityReport.metrics.shadows > 3 ? 'Dalis prarasta' : 'Išsaugotos'}</b></div></div></section>
-          <section className="quality-ai-panel"><div className="ai-icon">AI</div><div><h2>AI techninės kokybės vertinimas</h2><p>Kitas etapas: prijungti atskirą IQA modelį, kuris vertins ryškumą, triukšmą, suspaudimo artefaktus ir bendrą techninę kokybę. Jis nebus naudojamas objektams atpažinti.</p><small>AI modelis dar neprijungtas. Dabartinė išvada paremta matematiniais vaizdo matavimais.</small></div><span className="coming-soon">Kitas etapas</span></section>
+          <section className="quality-ai-panel"><div className="ai-icon">AI</div><div className="ai-panel-content"><h2>AI techninės kokybės vertinimas</h2><p>DBCNN modelis vertina bendrą fotografijos techninę kokybę. Analizei siunčiamas tik dabartinis apkirptas kadras. Vaizdas apdorojamas šiame kompiuteryje, ne debesijoje.</p>{aiResult ? <div className="ai-result"><b>{aiResult.label}</b><span>{aiResult.explanation}</span><small>DBCNN modelis · KonIQ-10k duomenų bazė · preliminarus vertinimas</small></div> : <small>{aiError || 'AI modelis veikia per atskirą vietinį servisą. Pirmą kartą reikia įdiegti modelį ir paleisti servisą.'}</small>}</div><button className="ai-run-button" onClick={runAiQuality} disabled={aiBusy || qualityBusy}>{aiBusy ? <><Loader2 className="spin" size={15}/> Vertinama…</> : 'Atlikti AI vertinimą'}</button></section>
         </>}
       </div>}
     </main>}

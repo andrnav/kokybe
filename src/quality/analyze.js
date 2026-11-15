@@ -171,6 +171,16 @@ function makeFindings(m, dpi, targetDpi, printer, formatCm) {
   return findings;
 }
 
+export async function createQualityCropBlob(photo, options) {
+  const { format, mode, getCrop, getOrientation, getTargetRatio } = options;
+  const geometry = getPrintGeometry(photo, format, mode, getCrop, getOrientation, getTargetRatio);
+  const { canvas } = sampleCrop(photo, geometry, mode, getTargetRatio);
+  return await new Promise((resolve, reject) => canvas.toBlob(
+    blob => blob ? resolve(blob) : reject(new Error('Nepavyko paruošti apkirpto kadro AI analizei.')),
+    'image/jpeg', 0.94
+  ));
+}
+
 export function analyzePhoto(photo, options) {
   const { format, mode, getCrop, getOrientation, getTargetRatio, targetDpi } = options;
   const geometry = getPrintGeometry(photo, format, mode, getCrop, getOrientation, getTargetRatio);

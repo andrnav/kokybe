@@ -116,3 +116,15 @@ Naršyklės saugumo apribojimai neleidžia įprastai svetainei savarankiškai į
 
 ## 2.1.1 pataisymas
 - Pašalinta neegzistuojančio `score` kintamojo nuoroda, dėl kurios kokybės analizė nutrūkdavo su `score is not defined` klaida.
+
+
+## v2.2.0 – vietinis AI kokybės vertinimas
+
+- Pridėtas DBCNN no-reference IQA modelio vietinis servisas.
+- Modelis pirmą kartą įdiegiamas į `~/Desktop/FotoInspektorius/models`; vėliau pakartotinai nebesiunčiamas.
+- Web aplikacija AI vertinimui siunčia tik dabartinį apkirptą kadrą į vietinį `127.0.0.1:8765` servisą.
+- AI vertinimas papildomas matematinės analizės išvadas, jų nepakeičia.
+- Kokybės ataskaitos šviesiame fone pataisytas teksto kontrastas.
+- Diegimo instrukcijos: `ai-local/README.md`.
+
+**Apribojimas:** DBCNN modelis bendros fotografijos kokybės vertinimui apmokytas KonIQ-10k duomenimis. Jis nėra specialiai kalibruotas Noritsu QSS-3701 ar Mimaki JV100-160 spaudai. Jo signalą būtina palyginti su realiais spaudiniais; dabartinės interpretavimo ribos yra preliminarios.
