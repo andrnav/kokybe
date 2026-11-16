@@ -1,7 +1,7 @@
 {
   "name": "foto-inspektorius",
   "private": true,
-  "version": "2.1.14",
+  "version": "2.1.15",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
@@ -15,7 +15,10 @@
     "react-dom": "^18.3.1",
     "utif": "^3.1.0",
     "pdfjs-dist": "^4.10.38",
-    "heic-to": "^1.6.7"
+    "heic-to": "^1.6.7",
+    "react-filerobot-image-editor": "5.0.0-beta.159",
+    "react-konva": "^18.2.10",
+    "styled-components": "^6.1.19"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

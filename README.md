@@ -142,3 +142,12 @@ Skirsnis „Nuotraukos kokybė“ nebėra išjungtas. Jame kiekviena nuotrauka v
 - JPG JFIF metaduomenyse įrašomas pasirinktas DPI.
 - Kiti kadravimo režimai nepakeisti.
 - Pašalintas fiksuotas „320 DPI“ užrašas iš „Real Size“ mygtuko.
+
+
+## v2.1.15 – bandomasis „Filerobot Image Editor“
+
+- Pridėta atskira viršutinio meniu skiltis „Testinis koregavimas“.
+- Integruota React biblioteka `react-filerobot-image-editor`; naudojamos React 18 suderinamos `react-konva` ir `styled-components` priklausomybės.
+- Redaktoriuje galima atidaryti aktyvią pagrindinės partijos nuotrauką arba pasirinkti atskirą vaizdo failą.
+- Išsaugotas rezultatas rodomas atskirai ir gali būti atsisiųstas; jis nekeičia pagrindinės nuotraukų partijos ar originalo.
+- PDF importo rasterizavimas paliktas 300 DPI (`scale: 300 / 72`).
