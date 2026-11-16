@@ -105,16 +105,40 @@ Skirsnis „Nuotraukos kokybė“ nebėra išjungtas. Jame kiekviena nuotrauka v
 - Nauji failai: `src/quality/` (`engine.js`, `analyze.js`, `ai.js`, `useQuality.js`, `QualityTab.jsx`). Naujų npm priklausomybių nėra.
 
 
-## v2.2.0 – išplėsta skirsnio „Nuotraukos kokybė“ analizė
+## v2.1.2 – supaprastintas kokybės vertinimas
 
-- **Tik kadro sritis.** Vertinama tik tai, kas pateks ant popieriaus (Kadravimas, Įtalpinta su priartinimu, Real Size, Laisvas). Nuotrauka vieną kartą išmatuojama 128×128 px fragmentais (iki 400), todėl pakeitus kadravimą vertinimas perskaičiuojamas iš karto.
-- **Ryškumo žemėlapis** (žymimasis langelis viršuje) ir neryškumo rūšis: judesio suliejimas (pagal gradientų kryptingumą) ar nefokusavimas.
-- **Tikroji raiška:** padidintos / suliesintos / stipriai suglaudintų nuotraukų aptikimas (pvz. „WhatsApp“, ekrano kopijos); tokiai nuotraukai dpi mažinamas.
-- **JPEG glaudinimas:** kokybė iš kvantavimo lentelių + blokelių artefaktai.
-- **Šešėliai ir šviesūs plotai:** išdegę kanalai (R/G/B), užstrigę šešėliai, triukšmas tamsiose zonose, kontrastas (2–98 %), kontrajutė.
-- **Šviesos ir spalvų triukšmas** atskirai.
-- **Žiūrėjimo atstumas:** Arti / Įprastai / Toli.
-- **Savo ONNX modelis iš failo:** pasirenkate parsisiųstą `.onnx` (DBCNN, HyperIQA, MUSIQ, MANIQA, TReS, CLIP-IQA), jis išsaugomas naršyklės IndexedDB ir kraunamas automatiškai. Vykdoma onnxruntime-web (WASM) 1.22.0, įkeliama iš CDN. Vertinamas bendras kadras ir iki 4 tikrų detaliausių fragmentų. Modelio tipas nustatomas pagal failo pavadinimą, nuostatas galima keisti. Mažas CLIP AI paliktas kaip alternatyva.
-- Spalvos / atspalviai sąmoningai nevertinami (koreguojama gaminant). Nuotraukos nekeičiamos – tik diagnostika.
-- Nauji failai: `src/quality/metrics.js`, `jpeg.js`, `onnxModel.js`. Naujų npm priklausomybių nėra.
-- Ribos yra pradinės, patikrintos tik su sintetinėmis nuotraukomis; realaus ONNX modelio šioje aplinkoje išbandyti nebuvo galima (testuota su imitacija).
+- Pašalintas ilgas paaiškinimas, „tik problemines“ filtras ir viršutinis įvertinimų skaitiklis.
+- Paliktas pagrindinis „Analizuoti nuotraukas“ mygtukas.
+- Pirmoji kokybės pastaba rodo numatomą žiūrėjimo atstumą ir gerai kokybei reikalingą DPI.
+- Matematinės išvados pateikiamos žmonėms suprantamais įvertinimais: Puiki, Gera, Tinka, Ribinė, Prasta.
+- „AI antra nuomonė“ pervadinta į „AI patikra“.
+- AI rezultatai rodomi atskirai kaip 1–5 įvertinimai: aštrumas, vaizdo švara, ekspozicija, kontrastas ir bendra kokybė. 1–5 skalė yra sąsajos interpretacija, perskaičiuota iš CLIP-IQA porinių tikimybių, o ne modelio gamyklinis balas.
+
+## v2.1.3
+- Nuotraukų kokybės sąraše vietoje originalaus failo matmenų rodomi tikrieji šaltinio pikseliai po pasirinkto kadravimo ir priartinimo.
+- Prie kiekvienos nuotraukos rodomas faktinis DPI pagal pasirinktą spaudos formatą.
+- Neberodomas nereikalingas „Kadravimas“ režimo tekstas.
+- Laisvo formato atveju DPI nerodomas, nes nėra pasirinkto fizinio spaudos dydžio.
+
+
+## v2.1.4 – vieningas kokybės vertinimas
+
+- Kadravimo įrankių juosta ir „Nuotraukos kokybė“ naudoja tą pačią `quality/engine.js` vertinimo funkciją ir tuos pačius išsaugomus nustatymus.
+- Pašalinta atskira sena DPI tikslų lentelė iš krumpliaračio nustatymų, kuri galėjo rodyti kitokį įvertinimą. Krumpliaračio mygtukas atidaro „Nuotraukos kokybė“ skiltį, kur yra vieninteliai vertinimo nustatymai.
+- DPI rodomas vienu skaičiumi: naudojama mažesnė iš horizontalios ir vertikalios DPI reikšmių, t. y. konservatyvesnė spaudos raiška.
+- Kokybės skiltyje prie kiekvienos nuotraukos taip pat rodomas vienas DPI skaičius.
+
+
+## v2.1.5 pakeitimai
+- Laisvo kadravimo rėmelį galima perkelti tempiant jį pele; rėmelio pozicija apribojama nuotraukos ribomis.
+- Laisvo kadravimo dydžio keitimo rankenėlė išlieka apatiniame dešiniajame kampe.
+- Miniatiūrų kopijų valdiklių tvarka pakeista į `+`, skaičius, `−`.
+
+
+## v2.1.6 – Real Size DPI pasirinkimas
+
+- „Real Size“ režime virš nuotraukos galima pasirinkti 320 DPI (numatytasis) arba 300 DPI.
+- Eksportuojamo JPG failo pikselių matmenys apskaičiuojami pagal pasirinktą fizinį formatą ir DPI.
+- JPG JFIF metaduomenyse įrašomas pasirinktas DPI.
+- Kiti kadravimo režimai nepakeisti.
+- Pašalintas fiksuotas „320 DPI“ užrašas iš „Real Size“ mygtuko.
