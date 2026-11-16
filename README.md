@@ -144,6 +144,14 @@ Skirsnis „Nuotraukos kokybė“ nebėra išjungtas. Jame kiekviena nuotrauka v
 - Pašalintas fiksuotas „320 DPI“ užrašas iš „Real Size“ mygtuko.
 
 
+## v2.1.16 – „Filerobot“ suderinamumo pataisa
+
+- „react-filerobot-image-editor“ pakeista iš 5.0.0 beta versijos į stabilią 4.9.1 versiją.
+- 4.9.1 deklaruoja suderinamumą su React 17+ ir `react-konva` 17+; palikta projekto React 18.3.1 bei `react-konva` 18.x versija.
+- Nereikia `--force`, `--legacy-peer-deps` ar React atnaujinimo.
+- Testinio redaktoriaus funkcionalumas ir atskyrimas nuo pagrindinio darbo srauto išlaikyti.
+
+
 ## v2.1.15 – bandomasis „Filerobot Image Editor“
 
 - Pridėta atskira viršutinio meniu skiltis „Testinis koregavimas“.
