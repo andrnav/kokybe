@@ -96,7 +96,7 @@ function drawSquare(img, sx, sy, size, ctx) {
 }
 
 // metrics – iš analyzePhoto (naudojami tikri detaliausi fragmentai ryškumui ir triukšmui)
-export async function scorePhoto(photo, metrics) {
+export async function scorePhoto(photo, metrics, region) {
   const img = photo.image, W = photo.width, H = photo.height, N = SIZE;
   const c = document.createElement('canvas'); c.width = N; c.height = N;
   const x = c.getContext('2d', { willReadFrequently: true });
@@ -104,8 +104,10 @@ export async function scorePhoto(photo, metrics) {
   try {
     const views = [];
     // 1) bendras vaizdas (centrinis kvadratas, sumažintas)
-    const side = Math.min(W, H);
-    views.push({ kind: 'global', data: drawSquare(img, (W - side) / 2, (H - side) / 2, side, x) });
+    const r = region || { x: 0, y: 0, w: W, h: H };
+    const side = Math.max(1, Math.min(r.w, r.h));
+    const gx = Math.max(0, Math.min(W - side, r.x + (r.w - side) / 2)), gy = Math.max(0, Math.min(H - side, r.y + (r.h - side) / 2));
+    views.push({ kind: 'global', data: drawSquare(img, gx, gy, side, x) });
     // 2) tikri (nesumažinti) detaliausi fragmentai – ryškumui ir triukšmui
     const ps = ((metrics && metrics.patches) || []).slice(0, 4);
     for (const p of ps) {

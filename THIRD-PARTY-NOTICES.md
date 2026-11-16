@@ -18,3 +18,11 @@ conversion of OpenAI CLIP) from Hugging Face. Both are fetched at runtime only a
 user clicks "Atsisiųsti ir įjungti AI"; neither is bundled with Foto inspektorius.
 See the model card on Hugging Face for the model's license terms.
 https://github.com/huggingface/transformers.js
+
+## onnxruntime-web and user-supplied ONNX models (optional)
+
+When the user selects an ONNX quality model, Foto inspektorius loads `onnxruntime-web` 1.22.0 (Microsoft, MIT)
+from the jsDelivr CDN at runtime; it is not bundled. The model file is supplied by the user and stays in the
+browser's IndexedDB; its licence is that of the model's authors (e.g. the weights listed on Hugging Face
+`86Cao/IQA-ONNX-Models`, whose wrapper is Apache-2.0 while the original weights keep their own licences).
+https://github.com/microsoft/onnxruntime
