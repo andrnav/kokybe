@@ -226,34 +226,3 @@
 .cutline-switch.is-on .cutline-switch-track{background:#29966b}
 .cutline-switch.is-on .cutline-switch-track span{transform:translateX(12px)}
 @media(max-width:760px){.cutline-switch{margin-left:0}}
-
-/* Atskira bandomoji Filerobot koregavimo skiltis */
-.test-editor-tab{min-height:calc(100vh - 68px);padding:28px 34px 40px;background:#f6f7f9;overflow:auto}
-.test-editor-heading{display:flex;align-items:center;justify-content:space-between;gap:24px;margin:0 auto 22px;max-width:1440px}
-.test-editor-title{display:flex;align-items:center;gap:14px;min-width:0}
-.test-editor-icon{width:46px;height:46px;display:grid;place-items:center;border-radius:13px;background:#e8efff;color:#315fd3;flex:none}
-.test-editor-title h1{font-size:21px;line-height:1.2;margin:0 0 5px;font-weight:700;color:#202633}
-.test-editor-title p{font-size:13px;color:#747d8c;margin:0}
-.test-editor-actions{display:flex;gap:9px;flex:none}
-.test-editor-content{max-width:1440px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.8fr);gap:22px;align-items:start}
-.test-editor-preview{min-height:480px;max-height:calc(100vh - 190px);display:grid;place-items:center;overflow:hidden;background:#e9ebef;border:1px solid #e0e3e9;border-radius:14px}
-.test-editor-preview>img{display:block;max-width:100%;max-height:calc(100vh - 192px);object-fit:contain}
-.test-editor-empty{display:flex;flex-direction:column;align-items:center;gap:12px;padding:30px;text-align:center;color:#7b8492}
-.test-editor-empty b{font-size:16px;color:#343b48}
-.test-editor-empty span{max-width:340px;font-size:13px;line-height:1.5}
-.test-editor-info{padding:24px;background:#fff;border:1px solid #e5e8ee;border-radius:14px;box-shadow:0 4px 18px #1d29390a}
-.test-editor-eyebrow{font-size:10px;font-weight:700;letter-spacing:.09em;color:#8490a1}
-.test-editor-info h2{font-size:16px;line-height:1.4;overflow-wrap:anywhere;margin:9px 0 10px;color:#252c38}
-.test-editor-info>p{font-size:13px;line-height:1.6;color:#697384;margin:0 0 18px}
-.test-editor-launch{width:100%;justify-content:center}
-.test-editor-note{display:flex;gap:8px;align-items:flex-start;margin-top:20px;padding-top:16px;border-top:1px solid #edf0f4;font-size:12px;line-height:1.5;color:#818a98}
-.test-editor-note svg{flex:none;margin-top:1px}
-.test-editor-saved{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;margin-top:22px;padding-top:18px;border-top:1px solid #edf0f4}
-.test-editor-saved>div{min-width:0;display:flex;flex-direction:column;gap:4px}
-.test-editor-saved b{font-size:13px;color:#273244}
-.test-editor-saved span{font-size:11px;color:#7a8492;overflow-wrap:anywhere}
-.test-editor-saved img{grid-column:1/-1;width:100%;max-height:180px;object-fit:contain;background:#f4f5f7;border-radius:8px}
-.test-editor-error{margin-top:14px;padding:10px 12px;border-radius:8px;background:#fff0ef;color:#a7352d;font-size:12px;line-height:1.45}
-@media(max-width:900px){.test-editor-tab{padding:20px 16px}.test-editor-heading{align-items:flex-start;flex-direction:column}.test-editor-actions{flex-wrap:wrap}.test-editor-content{grid-template-columns:1fr}.test-editor-preview{min-height:320px;max-height:60vh}.test-editor-preview>img{max-height:60vh}}
-
-@media(max-width:760px){.tabs{overflow-x:auto;white-space:nowrap;flex:none}.tab{flex:none;padding:0 10px}}
