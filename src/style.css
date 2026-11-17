@@ -301,3 +301,137 @@ input[type="range"]{accent-color:#36a568}
 a{color:#75c995}
 button:hover{border-color:#55b97c}
 :focus-visible{outline-color:#55b97c}
+
+
+/* v2.7.4 – pilna šviesiai žalios spalvos tema */
+:root{
+  --mint-0:#f7fcf8;--mint-1:#edf7ef;--mint-2:#e1f0e5;
+  --mint-3:#cfe7d5;--mint-4:#b6d9c0;--mint-5:#8fc6a0;
+  --leaf-5:#6ab382;--leaf-6:#4d9b68;--leaf-7:#347c50;
+  --leaf-8:#245f3b;--leaf-9:#19472d;
+  --ink:#173b27;--ink-soft:#42634d;--line:#b7d7c0;
+}
+html,body,#root,.app-shell{
+  background:var(--mint-1)!important;color:var(--ink)!important
+}
+header,.topbar,.app-header,.tab-bar,.editor-header,.editor-footer,
+.sidebar,.side-panel,.toolbar,.photo-info,.queue,.queue-panel,
+.workspace,.photo-queue,.thumbnail-strip,.editor-panel{
+  background:var(--mint-2)!important;color:var(--ink)!important;
+  border-color:var(--line)!important
+}
+header{background:var(--mint-1)!important}
+nav,.tabs{background:var(--mint-2)!important}
+nav button,.tab-button{
+  color:var(--ink-soft)!important;background:transparent!important;
+  border-color:transparent!important
+}
+nav button.active,.tab-button.active,[aria-selected="true"]{
+  color:var(--leaf-9)!important;background:var(--mint-3)!important;
+  border-color:var(--leaf-6)!important;box-shadow:inset 0 -3px 0 var(--leaf-6)!important
+}
+.stage{
+  background:radial-gradient(ellipse at center,#e7f4e9 0%,#d9eddf 65%,#cce5d3 100%)!important
+}
+.print-sheet.mode-crop,.print-sheet.mode-real,.print-sheet.mode-fit{
+  background:#f7fcf8!important;
+  box-shadow:0 0 0 9999px rgba(202,229,209,.58),0 12px 42px rgba(31,76,46,.18)!important
+}
+.crop-shade{box-shadow:0 0 0 9999px rgba(174,211,184,.58)!important}
+.stage-hint,.zoom-control{
+  background:var(--mint-1)!important;color:var(--ink)!important;
+  border-color:var(--line)!important;box-shadow:0 2px 8px rgba(31,76,46,.08)
+}
+button,.segmented button,.mode-button,.tab-button{
+  background:var(--mint-1)!important;color:var(--ink)!important;
+  border:1px solid var(--line)!important;box-shadow:none!important
+}
+button:hover,.segmented button:hover,.mode-button:hover{
+  background:var(--mint-3)!important;border-color:var(--leaf-5)!important
+}
+button.active,.segmented button.active,.mode-button.active,
+nav button.active,[aria-selected="true"]{
+  background:var(--leaf-7)!important;border-color:var(--leaf-6)!important;
+  color:#fff!important;box-shadow:0 0 0 1px rgba(52,124,80,.12)!important
+}
+button.primary,.apply-all-button,.primary-button,.export-button,.download-button{
+  background:var(--leaf-7)!important;border-color:var(--leaf-6)!important;
+  color:#fff!important
+}
+button.primary:hover,.apply-all-button:hover,.primary-button:hover,
+.export-button:hover,.download-button:hover{background:var(--leaf-8)!important}
+.download-button .zip-pill{background:var(--mint-3)!important;color:var(--leaf-9)!important}
+.icon-button{background:var(--mint-2)!important;color:var(--leaf-8)!important}
+input,select,textarea,.input,.select,
+.custom-format-fields input,.q-grid input,.q-grid select{
+  background:var(--mint-0)!important;color:var(--ink)!important;
+  border:1px solid var(--mint-4)!important
+}
+input:focus,select:focus,textarea:focus{
+  outline:2px solid var(--leaf-5)!important;outline-offset:1px
+}
+input[type="range"]{accent-color:var(--leaf-6)!important}
+label,.rotation-controls>span,.orientation-control>span,
+.caption,.muted,.batch-count{color:var(--ink-soft)!important}
+.image-metrics,.image-metrics span,.image-metrics b,
+.photo-meta,.photo-meta span{color:var(--leaf-8)!important}
+.badge,.quality-badge{
+  background:var(--mint-3)!important;color:var(--leaf-9)!important;
+  border-color:var(--mint-4)!important
+}
+.photo-card,.thumbnail-card,.thumb-item,.queue-item{
+  background:var(--mint-1)!important;border-color:var(--mint-4)!important
+}
+.photo-card.selected,.thumbnail-card.selected,.thumb-item.selected{
+  border-color:var(--leaf-6)!important;box-shadow:0 0 0 1px var(--leaf-6)!important
+}
+.photo-card img,.thumbnail-card img{background:var(--mint-2)!important}
+.rotation-controls{
+  display:flex!important;align-items:center!important;gap:10px!important;
+  flex-wrap:wrap!important;min-height:58px
+}
+.rotation-controls>span{
+  display:flex;align-items:center;min-height:42px;
+  font-size:13px;font-weight:600;margin:0 2px 0 0
+}
+.rotation-controls button{
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  gap:8px!important;min-height:42px!important;padding:0 16px!important;
+  border-radius:10px!important;white-space:nowrap
+}
+.orientation-control{
+  display:flex!important;flex-direction:column!important;justify-content:center!important;
+  align-items:stretch!important;gap:7px!important;min-height:58px
+}
+.orientation-control>span{
+  display:block!important;min-height:18px;font-size:13px;font-weight:600;line-height:18px
+}
+.orientation-control .segmented{
+  display:flex;align-items:center;gap:4px;padding:3px;
+  background:var(--mint-3)!important;border:1px solid var(--mint-4)!important;
+  border-radius:10px
+}
+.orientation-control .segmented button{
+  min-height:36px!important;padding:0 15px!important;border-radius:8px!important
+}
+.editor-footer{align-items:center!important;gap:18px!important}
+.footer-actions{align-items:center!important}
+a{color:var(--leaf-7)!important}
+:focus-visible{outline-color:var(--leaf-6)!important}
+hr,.divider{border-color:var(--line)!important}
+
+/* Šviesi tema kokybės skiltyje ir visuose papildomuose languose */
+[class^="q-"],[class*=" q-"]{border-color:var(--line)!important}
+.q-tab,.q-panel,.q-card,.q-box,.q-row,.q-detail,.q-detail-grid>div,
+.q-metric,.q-stat,.q-section,.q-settings,.q-result{
+  background:var(--mint-1)!important;color:var(--ink)!important;border-color:var(--line)!important
+}
+.q-row.current,.q-detail summary{background:var(--mint-2)!important;color:var(--leaf-9)!important}
+.q-title,.q-name,.q-adv,.q-box summary,.q-detail-grid b,.q-how b{color:var(--ink)!important}
+.q-sub,.q-note,.q-how,.q-how p,.q-why li,.q-detail-grid span,.q-footer-msg,
+.q-grid label,.q-pending,.q-heat small{color:var(--ink-soft)!important}
+.q-thumb,.q-heat img{background:var(--mint-2)!important}
+.q-why li.ok::before{color:var(--leaf-6)!important}
+.q-findings .warn{background:#f7f0d9!important;color:#735b18!important}
+.q-findings .bad{background:#f8e4e4!important;color:#873d3d!important}
+.q-how a{color:var(--leaf-7)!important}
