@@ -566,3 +566,150 @@ svg{color:inherit}
 svg[stroke="#3b82f6"],svg[stroke="#2563eb"],svg[stroke="blue"]{stroke:var(--leaf-7)!important}
 hr,.divider,.section-divider{border-color:var(--line)!important}
 *{accent-color:var(--leaf-6)}
+
+
+/* v2.7.6 – švari, kontrastinga šviesi tema */
+:root{
+  color-scheme:light;
+  --page:#eef1f5;
+  --surface:#ffffff;
+  --surface-soft:#f5f7fa;
+  --surface-muted:#e9edf2;
+  --border:#cbd3dd;
+  --border-strong:#aeb9c7;
+  --text:#202a36;
+  --text-muted:#596779;
+  --text-soft:#718094;
+  --accent:#6750a4;
+  --accent-hover:#533d91;
+  --accent-soft:#eee9f8;
+  --success:#26734d;
+  --success-soft:#e5f3eb;
+  --danger:#b54747;
+  --warning:#956b19;
+}
+html,body,#root{background:var(--page)!important;color:var(--text)!important}
+body,.app-shell{background:var(--page)!important;color:var(--text)!important}
+.app-shell,.workspace,.editor-column,.quality-page,.quality-inner{
+  background:var(--page)!important;color:var(--text)!important
+}
+/* Visos pagrindinės plokštumos */
+.topbar,.tabs,.left-panel,.right-panel,.editor-column,.editor-header,
+.editor-panel,.editor-footer,.toolbar,.photo-info,.photo-queue,.queue,
+.queue-panel,.filmstrip,.strip-head,.strip-bottom,.strip-tools,
+.quality-settings,.settings-heading,.modal-content,.modal-window{
+  background:var(--surface)!important;color:var(--text)!important;
+  border-color:var(--border)!important
+}
+.editor-column,.left-panel,.right-panel{border:1px solid var(--border)!important}
+.stage,.empty-stage{
+  background:#e8edf3!important;color:var(--text)!important;
+  border-color:var(--border)!important
+}
+.stage-hint,.zoom-control,.modal-zoom,.modal-tools,.modal-top,.modal-side{
+  background:var(--surface)!important;color:var(--text-muted)!important;
+  border-color:var(--border)!important
+}
+/* Tekstų kontrastas. Išvalomi senieji šviesūs ir mėlyni tekstai. */
+body *{text-shadow:none!important}
+.brand,.brand *, .panel-title,.right-heading,.photo-name,.photo-title-group,
+.photo-meta,.photo-meta span,.batch-count,.toolbar-metrics,.caption,
+label,.muted,.side-note,.rotation-controls>span,.orientation-control>span,
+.q-title,.q-name,.q-adv,.q-sub,.q-note,.q-how,.q-how p,.q-why li,
+.q-detail-grid span,.q-footer-msg,.q-grid label{
+  color:var(--text-muted)!important
+}
+h1,h2,h3,h4,h5,h6,strong,b,.brand,.panel-title,.right-heading,
+.photo-name,.q-title,.q-name{color:var(--text)!important}
+.image-metrics,.image-metrics span,.image-metrics b,.photo-meta strong{
+  color:var(--success)!important
+}
+small,.format-option small{color:var(--text-muted)!important}
+/* Navigacija */
+.brand-icon,.icon-button,.expand-button{
+  background:var(--surface-muted)!important;color:var(--accent)!important;
+  border:1px solid var(--border)!important
+}
+.tab{background:transparent!important;color:var(--text-muted)!important}
+.tab.active{
+  background:var(--accent-soft)!important;color:var(--accent)!important;
+  border-bottom:3px solid var(--accent)!important
+}
+/* Mygtukai ir pasirinkimai */
+button,.mode-button,.format-option,.custom-format-option,.segmented button,
+.secondary,.primary,.primary-button,.apply-all-button,.export-button,
+.download-button,.upload-wide,.copies-control button,.thumb-copies button,
+.thumb-delete,.settings-actions button,.q-actions button{
+  color:var(--text)!important;background:var(--surface-soft)!important;
+  border:1px solid var(--border)!important;box-shadow:none!important
+}
+button:hover,.mode-button:hover,.format-option:hover,.secondary:hover{
+  background:var(--surface-muted)!important;border-color:var(--border-strong)!important
+}
+button.active,.tab.active,.mode-button.active,.format-option.selected,
+.custom-format-option.active,.segmented button.active,.mode.selected,
+.thumb-select.active{
+  background:var(--accent)!important;color:#fff!important;
+  border-color:var(--accent)!important
+}
+button.primary,.primary,.primary-button,.apply-all-button,.export-button,
+.download-button,.upload-wide{
+  background:var(--accent)!important;color:#fff!important;
+  border-color:var(--accent)!important
+}
+button.primary:hover,.primary:hover,.primary-button:hover,.apply-all-button:hover,
+.export-button:hover,.download-button:hover,.upload-wide:hover{
+  background:var(--accent-hover)!important;color:#fff!important
+}
+button:disabled,.disabled{
+  opacity:1!important;background:#e9edf2!important;color:#778496!important;
+  border-color:#d4dbe3!important;cursor:not-allowed!important
+}
+button:disabled svg{color:#778496!important;opacity:1!important}
+/* Įvedimo laukai */
+input,select,textarea,.input,.select,.format-select,
+.custom-format-fields input,.q-grid input,.q-grid select{
+  background:#fff!important;color:var(--text)!important;
+  border:1px solid var(--border-strong)!important
+}
+input::placeholder,textarea::placeholder{color:var(--text-soft)!important}
+input:focus,select:focus,textarea:focus{
+  outline:2px solid #9b8acb!important;outline-offset:1px
+}
+input[type=range]{accent-color:var(--accent)!important}
+/* Nuotraukų kortelės ir juosta */
+.photo-card,.thumbnail-card,.thumb-card,.thumb-item,.queue-item,
+.summary-card,.quality-table-row,.quality-table-head{
+  background:var(--surface)!important;color:var(--text)!important;
+  border-color:var(--border)!important
+}
+.photo-card.selected,.thumbnail-card.selected,.thumb-item.selected,
+.thumb-select.selected,.selected{
+  border-color:var(--accent)!important;
+  box-shadow:0 0 0 2px var(--accent-soft)!important
+}
+.photo-card img,.thumbnail-card img,.thumb-image{background:var(--surface-muted)!important}
+.strip-arrow{background:var(--surface-soft)!important;color:var(--accent)!important;border-color:var(--border)!important}
+.crop-shade{background:rgba(31,42,54,.22)!important}
+/* Būsenos, žymos, kokybės skiltis */
+.badge,.quality-badge,.quality-indicator,.zip-pill,.status-done{
+  background:var(--success-soft)!important;color:var(--success)!important;
+  border-color:#b9ddc8!important
+}
+.q-tab,.q-panel,.q-card,.q-box,.q-row,.q-detail,.q-detail-grid>div,
+.q-metric,.q-stat,.q-section,.q-settings,.q-result,.q-summary,
+.q-list,.q-res,.q-sum,.q-ai,.q-ctx,.q-problem,.q-empty{
+  background:var(--surface)!important;color:var(--text)!important;
+  border-color:var(--border)!important
+}
+.q-row.current,.q-detail summary,.q-head,.q-bar{
+  background:var(--surface-muted)!important;color:var(--text)!important
+}
+.q-findings .warn,.warn{background:#fff4d8!important;color:#765719!important}
+.q-findings .bad,.bad,.err{background:#fbe8e6!important;color:#873f38!important}
+.q-findings .good,.good,.ok{background:var(--success-soft)!important;color:var(--success)!important}
+a{color:var(--accent)!important}
+svg{color:inherit}
+hr,.divider,.section-divider{border-color:var(--border)!important;background:var(--border)!important}
+:focus-visible{outline:2px solid var(--accent)!important;outline-offset:2px}
+*{accent-color:var(--accent)}
