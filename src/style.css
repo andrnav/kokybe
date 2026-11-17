@@ -713,3 +713,136 @@ svg{color:inherit}
 hr,.divider,.section-divider{border-color:var(--border)!important;background:var(--border)!important}
 :focus-visible{outline:2px solid var(--accent)!important;outline-offset:2px}
 *{accent-color:var(--accent)}
+
+
+/* v2.7.7 – vientisa tamsiai žalia tema su aiškiu kontrastu */
+:root{
+ color-scheme:dark;
+ --dg-950:#081710;
+ --dg-900:#0d2118;
+ --dg-850:#132b20;
+ --dg-800:#193a2a;
+ --dg-700:#24563b;
+ --dg-600:#347a50;
+ --dg-500:#49a36b;
+ --dg-300:#9bd3ad;
+ --dg-200:#c2e5cc;
+ --dg-text:#e8f3eb;
+ --dg-muted:#b0c8b7;
+ --dg-border:#315b42;
+}
+html,body,#root,body,.app-shell,.workspace,.editor-column,.quality-page,.quality-inner{
+ background:var(--dg-950)!important;color:var(--dg-text)!important;
+}
+.topbar,.tabs,.left-panel,.right-panel,.editor-column,.editor-header,
+.editor-panel,.editor-footer,.toolbar,.photo-info,.photo-queue,.queue,
+.queue-panel,.filmstrip,.strip-head,.strip-bottom,.strip-tools,
+.quality-settings,.settings-heading,.modal-content,.modal-window,
+.sidebar,.side-panel,.rotation-controls,.orientation-control{
+ background:var(--dg-900)!important;color:var(--dg-text)!important;
+ border-color:var(--dg-border)!important;
+}
+.stage,.empty-stage{
+ background:radial-gradient(ellipse at center,#1c3c2b 0%,#10291d 68%,#0a1c13 100%)!important;
+ color:var(--dg-text)!important;border-color:var(--dg-border)!important;
+}
+.stage-hint,.zoom-control,.modal-zoom,.modal-tools,.modal-top,.modal-side{
+ background:var(--dg-850)!important;color:var(--dg-text)!important;
+ border-color:var(--dg-border)!important;
+}
+body *{text-shadow:none!important}
+.brand,.brand *,h1,h2,h3,h4,h5,h6,strong,b,.panel-title,.right-heading,
+.photo-name,.photo-title-group,.photo-meta,.photo-meta span,.batch-count,
+.toolbar-metrics,.caption,label,.muted,.side-note,.rotation-controls>span,
+.orientation-control>span,.q-title,.q-name,.q-adv,.q-sub,.q-note,.q-how,
+.q-how p,.q-why li,.q-detail-grid span,.q-footer-msg,.q-grid label{
+ color:var(--dg-text)!important;
+}
+small,.muted,.side-note,.caption{color:var(--dg-muted)!important}
+.image-metrics,.image-metrics span,.image-metrics b,.photo-meta strong{
+ color:var(--dg-300)!important;
+}
+.brand-icon,.icon-button,.expand-button,.strip-arrow{
+ background:var(--dg-800)!important;color:var(--dg-200)!important;
+ border:1px solid var(--dg-border)!important;
+}
+.tab{background:transparent!important;color:var(--dg-muted)!important}
+.tab.active,.tab-button.active,.editor-nav .active,.tabs .active{
+ background:var(--dg-700)!important;color:#fff!important;
+ border-color:var(--dg-500)!important;
+}
+button,.mode-button,.format-option,.custom-format-option,.segmented button,
+.secondary,.primary,.primary-button,.apply-all-button,.export-button,
+.download-button,.upload-wide,.copies-control button,.thumb-copies button,
+.thumb-delete,.settings-actions button,.q-actions button{
+ background:var(--dg-850)!important;color:var(--dg-text)!important;
+ border:1px solid var(--dg-border)!important;box-shadow:none!important;
+}
+button:hover,.mode-button:hover,.format-option:hover,.secondary:hover{
+ background:var(--dg-800)!important;border-color:var(--dg-500)!important;
+}
+button.active,.tab.active,.mode-button.active,.format-option.selected,
+.custom-format-option.active,.segmented button.active,.mode.selected,
+.thumb-select.active{
+ background:var(--dg-600)!important;color:#fff!important;
+ border-color:var(--dg-500)!important;
+}
+button.primary,.primary,.primary-button,.apply-all-button,.export-button,
+.download-button,.upload-wide{
+ background:var(--dg-600)!important;color:#fff!important;
+ border-color:var(--dg-500)!important;
+}
+button.primary:hover,.primary:hover,.primary-button:hover,.apply-all-button:hover,
+.export-button:hover,.download-button:hover,.upload-wide:hover{
+ background:var(--dg-700)!important;color:#fff!important;
+}
+button:disabled,.disabled{
+ opacity:1!important;background:#1b3025!important;color:#829b89!important;
+ border-color:#294635!important;cursor:not-allowed!important;
+}
+button:disabled svg{color:#829b89!important;opacity:1!important}
+input,select,textarea,.input,.select,.format-select,
+.custom-format-fields input,.q-grid input,.q-grid select{
+ background:#10271b!important;color:var(--dg-text)!important;
+ border:1px solid #426c50!important;
+}
+input::placeholder,textarea::placeholder{color:#9ab5a1!important}
+input:focus,select:focus,textarea:focus{
+ outline:2px solid var(--dg-500)!important;outline-offset:1px;
+}
+input[type=range]{accent-color:var(--dg-500)!important}
+.photo-card,.thumbnail-card,.thumb-card,.thumb-item,.queue-item,
+.summary-card,.quality-table-row,.quality-table-head{
+ background:var(--dg-900)!important;color:var(--dg-text)!important;
+ border-color:var(--dg-border)!important;
+}
+.photo-card.selected,.thumbnail-card.selected,.thumb-item.selected,
+.thumb-select.selected,.selected{
+ border-color:var(--dg-500)!important;
+ box-shadow:0 0 0 2px #347a5055!important;
+}
+.photo-card img,.thumbnail-card img,.thumb-image{
+ background:var(--dg-850)!important;
+}
+.crop-shade{background:rgba(0,10,5,.58)!important}
+.badge,.quality-badge,.quality-indicator,.zip-pill,.status-done{
+ background:#1d4930!important;color:#bce8c8!important;
+ border-color:#347a50!important;
+}
+.q-tab,.q-panel,.q-card,.q-box,.q-row,.q-detail,.q-detail-grid>div,
+.q-metric,.q-stat,.q-section,.q-settings,.q-result,.q-summary,
+.q-list,.q-res,.q-sum,.q-ai,.q-ctx,.q-problem,.q-empty{
+ background:var(--dg-900)!important;color:var(--dg-text)!important;
+ border-color:var(--dg-border)!important;
+}
+.q-row.current,.q-detail summary,.q-head,.q-bar{
+ background:var(--dg-850)!important;color:var(--dg-text)!important;
+}
+.q-findings .warn,.warn{background:#493b1d!important;color:#f1d99b!important}
+.q-findings .bad,.bad,.err{background:#482624!important;color:#f0b4ad!important}
+.q-findings .good,.good,.ok{background:#1d4930!important;color:#bce8c8!important}
+a{color:var(--dg-300)!important}
+svg{color:inherit}
+hr,.divider,.section-divider{border-color:var(--dg-border)!important;background:var(--dg-border)!important}
+:focus-visible{outline:2px solid var(--dg-500)!important;outline-offset:2px}
+*{accent-color:var(--dg-500)}
