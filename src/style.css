@@ -215,3 +215,65 @@
 .q-findings .warn{background:#3b301a;color:#f2cf78}
 .q-findings .bad{background:#421f25;color:#ff9ba5}
 @media(max-width:760px){.q-detail-grid{grid-template-columns:1fr 1fr}}
+
+
+/* Footer controls: consistent sizing and alignment */
+.editor-footer{
+  display:flex;
+  align-items:center;
+  gap:22px;
+  flex-wrap:wrap;
+}
+.rotation-controls{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:nowrap;
+}
+.rotation-controls>span,
+.orientation-control>span{
+  font-size:16px!important;
+  line-height:1.2;
+  font-weight:600;
+  white-space:nowrap;
+  margin:0 8px 0 0;
+}
+.rotation-controls button{
+  min-height:48px;
+  height:48px;
+  padding:0 18px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  font-size:15px;
+  white-space:nowrap;
+}
+.orientation-control{
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  gap:10px;
+}
+.orientation-control .segmented{
+  display:flex;
+  align-items:center;
+  height:48px;
+  box-sizing:border-box;
+  padding:3px;
+}
+.orientation-control .segmented button{
+  height:40px;
+  min-height:40px;
+  padding:0 18px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:15px;
+  white-space:nowrap;
+}
+@media(max-width:900px){
+  .editor-footer{gap:12px}
+  .rotation-controls,.orientation-control{flex-wrap:wrap}
+  .rotation-controls>span,.orientation-control>span{font-size:14px!important}
+}
