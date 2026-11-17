@@ -242,3 +242,62 @@
 .image-metrics b {
   color: #174a30 !important;
 }
+
+
+/* v2.7.3 – vientisa žalia sąsajos paletė */
+:root{
+  --green-950:#071a13;--green-900:#0b241a;--green-850:#103324;
+  --green-800:#16432e;--green-700:#1d5b3d;--green-600:#28784f;
+  --green-500:#36a568;--green-300:#8bd5a8;--green-200:#bce9ca;
+  --green-100:#e8f6ec;--green-50:#f3faf5;
+  --ui-bg:#0b1711;--panel-bg:#102219;--panel-2:#173326;
+  --line:#28543c;--text:#e6f4e9;--muted:#a8c4b0;
+}
+body,.app-shell{background:var(--green-950);color:var(--text)}
+header,.topbar,.app-header,.tab-bar,.editor-header,.editor-footer,
+.sidebar,.side-panel,.toolbar,.photo-info,.queue,.queue-panel{
+  background:var(--panel-bg)!important;border-color:var(--line)!important;color:var(--text)!important
+}
+.stage{background:radial-gradient(ellipse at center,#173b2a 0%,#0d281c 62%,#071a13 100%)!important}
+.print-sheet.mode-crop,.print-sheet.mode-real{
+  background:#0b241a!important;box-shadow:0 0 0 9999px rgba(3,16,10,.68),0 12px 42px #0008
+}
+button,.segmented button,.mode-button,.tab-button{
+  border-color:var(--line)!important;color:var(--text)!important
+}
+button.active,.segmented button.active,.mode-button.active,.tab-button.active,
+nav button.active,[aria-selected="true"]{
+  background:#1d5b3d!important;border-color:#45b879!important;color:#effff3!important;
+  box-shadow:0 0 0 1px rgba(69,184,121,.16)
+}
+button.primary,.apply-all-button,.primary-button,.export-button{
+  background:#1d5b3d!important;border-color:#36895a!important;color:#effff3!important
+}
+button.primary:hover,.apply-all-button:hover,.primary-button:hover,.export-button:hover{background:#28784f!important}
+input,select,textarea,.input,.select{
+  background:#e8f6ec!important;color:#173d29!important;border:1px solid #9acdad!important
+}
+input:focus,select:focus,textarea:focus{outline:2px solid #55b97c!important;outline-offset:1px}
+input[type="range"]{accent-color:#36a568}
+.image-metrics,.image-metrics span,.photo-meta,.photo-meta span{
+  color:#75c995!important
+}
+.badge,.quality-badge{background:#173f2b!important;color:#a8e5bb!important;border-color:#286b45!important}
+.rotation-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rotation-controls>span{font-size:12px;color:var(--muted);margin-right:4px}
+.rotation-controls button{display:inline-flex;align-items:center;gap:6px}
+.orientation-control .segmented button{background:#173326!important}
+.orientation-control .segmented button.active{background:#1d5b3d!important}
+.stage-hint{background:#10291d!important;color:#d7eadc!important}
+.zoom-control{background:#10291d!important;border-color:#35664a!important;color:#e6f4e9!important}
+.queue,.photo-queue,.thumbnail-strip{background:#102219!important;border-color:#28543c!important}
+.photo-card,.thumbnail-card{border-color:#35664a!important}
+.photo-card.selected,.thumbnail-card.selected{border-color:#45b879!important}
+.crop-shade{box-shadow:0 0 0 9999px rgba(3,16,10,.62)!important}
+.stage-photo{pointer-events:none}
+.print-sheet{touch-action:none}
+
+/* Pašalinami likę mėlyni akcentai */
+a{color:#75c995}
+button:hover{border-color:#55b97c}
+:focus-visible{outline-color:#55b97c}

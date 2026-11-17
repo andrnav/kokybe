@@ -7,7 +7,7 @@ import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import * as UTIF from 'utif';
 import QualityTab from './quality/QualityTab.jsx';
 import { useQuality } from './quality/useQuality.js';
-import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2 } from 'lucide-react';
+import { Camera, ImagePlus, Download, RotateCcw, ChevronLeft, ChevronRight, Crop, Square, Ruler, ZoomIn, ZoomOut, Images, CircleHelp, Settings2, Move, Loader2, Trash2, RotateCw } from 'lucide-react';
 import './style.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -170,10 +170,11 @@ function getCrop(photo) {
     const base = photo.freeCrop || { x: 0, y: 0, w: photo.width, h: photo.height };
     const zoom = clamp(Number(photo.zoom || 1), 1, 4);
     const sw = base.w / zoom, sh = base.h / zoom;
-    const maxX = Math.max(0, (base.w - sw) / 2), maxY = Math.max(0, (base.h - sh) / 2);
-    const cx = base.x + base.w / 2 - clamp(Number(photo.pan?.x || 0), -1, 1) * maxX;
-    const cy = base.y + base.h / 2 - clamp(Number(photo.pan?.y || 0), -1, 1) * maxY;
-    return { sx: clamp(cx - sw / 2, 0, photo.width - sw), sy: clamp(cy - sh / 2, 0, photo.height - sh), sw, sh, baseW: base.w, baseH: base.h, target: sw / sh };
+    const maxX = Math.max(0, (photo.width - sw) / 2), maxY = Math.max(0, (photo.height - sh) / 2);
+    const baseX = base.x + (base.w - sw) / 2, baseY = base.y + (base.h - sh) / 2;
+    const sx = clamp(baseX - clamp(Number(photo.pan?.x || 0), -1, 1) * maxX, 0, photo.width - sw);
+    const sy = clamp(baseY - clamp(Number(photo.pan?.y || 0), -1, 1) * maxY, 0, photo.height - sh);
+    return { sx, sy, sw, sh, baseW: base.w, baseH: base.h, target: sw / sh };
   }
   const target = getTargetRatio(photo);
   const iw = photo.width, ih = photo.height;
@@ -351,6 +352,52 @@ function App() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [photos, activeId, tab]);
+
+
+  const rotatePhoto = async photo => {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Nepavyko perskaityti nuotraukos'));
+      img.src = photo.url;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = photo.height;
+    canvas.height = photo.width;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(Math.PI / 2);
+    ctx.drawImage(image, -photo.width / 2, -photo.height / 2, photo.width, photo.height);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.98));
+    if (!blob) throw new Error('Nepavyko pasukti nuotraukos');
+    const url = URL.createObjectURL(blob);
+    return { ...photo, url, width: canvas.width, height: canvas.height,
+      freeCrop: { x: 0, y: 0, w: canvas.width, h: canvas.height },
+      orientation: 'auto', zoom: 1, pan: { x: 0, y: 0 }, status: 'editing' };
+  };
+  const rotateActive = async () => {
+    if (!active || busy) return;
+    setBusy(true);
+    try {
+      const next = await rotatePhoto(active);
+      URL.revokeObjectURL(active.url);
+      updatePhoto(active.id, next);
+      setZoom(1); setPan({ x: 0, y: 0 });
+    } catch (error) { setMessage('Nepavyko pasukti nuotraukos.'); }
+    finally { setBusy(false); }
+  };
+  const rotateAll = async () => {
+    if (!photos.length || busy) return;
+    setBusy(true);
+    try {
+      const rotated = await Promise.all(photos.map(rotatePhoto));
+      setPhotos(rotated);
+      photos.forEach(photo => URL.revokeObjectURL(photo.url));
+      setZoom(1); setPan({ x: 0, y: 0 });
+      setMessage('Visos nuotraukos pasuktos 90° pagal laikrodžio rodyklę.');
+    } catch (error) { setMessage('Nepavyko pasukti visų nuotraukų.'); }
+    finally { setBusy(false); }
+  };
 
   const applyModeToAll = nextMode => {
     setMode(nextMode);
@@ -563,7 +610,7 @@ function App() {
         <button className="apply-all-button" onClick={() => applyModeToAll(selectedMode)} disabled={!photos.length}>Taikyti visoms nuotraukoms</button>
         <div className="section-divider"/><div className="panel-title">3. Eksportas</div><div className="select-wrap"><select value={exportFormat} onChange={e => setExportFormat(e.target.value)}><option value="jpg">JPG</option><option value="tif">TIFF · 8 bitų · Lossless</option></select></div></aside>
       <section className="editor-column"><div className="editor-toolbar"><div className="photo-title-group"><div className="photo-name">{active?.name || 'Nuotrauka nepasirinkta'}</div><div className="image-metrics toolbar-metrics">{metrics && <><span><b>{metrics.widthPx.toLocaleString('lt-LT')} × {metrics.heightPx.toLocaleString('lt-LT')} px</b></span><span>{metrics.size}</span><span><b>{metrics.dpi}</b></span><span className={`quality-indicator ${metrics.qualityClass}`} title={metrics.targetDpi ? `Tikslas: ${metrics.targetDpi} DPI` : 'Laisvam formatui kokybė pagal spaudos dydį neskaičiuojama'}>Kokybė: <b>{metrics.quality}</b></span></>}</div></div><div className="editor-nav"><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i > 0) navigateTo(photos[i - 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === 0}><ChevronLeft size={17}/> Ankstesnė</button><span>{active ? `${photos.findIndex(p => p.id === activeId) + 1} iš ${photos.length}` : '0 iš 0'}</span><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i < photos.length - 1) navigateTo(photos[i + 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === photos.length - 1}>Kita <ChevronRight size={17}/></button></div></div>
-        {renderStage()}<div className="editor-footer"><div className="orientation-control"><span>Orientacija</span><div className="segmented"><button className={selectedOrientation === 'auto' ? 'active' : ''} onClick={() => patchActive({ orientation: 'auto' })}>Automatinė</button><button className={selectedOrientation === 'vertical' ? 'active' : ''} onClick={() => patchActive({ orientation: 'vertical' })}>Vertikali</button><button className={selectedOrientation === 'horizontal' ? 'active' : ''} onClick={() => patchActive({ orientation: 'horizontal' })}>Horizontali</button></div></div><div className="footer-actions"><button className="secondary" onClick={reset} disabled={!active}><RotateCcw size={16}/> Atstatyti</button><button className="secondary" onClick={exportCurrent} disabled={!active}><Download size={16}/> Atsisiųsti šią nuotrauką</button></div></div></section>
+        {renderStage()}<div className="editor-footer"><div className="rotation-controls"><span>Vaizdo pasukimas</span><button className="secondary" onClick={rotateActive} disabled={!active || busy}><RotateCw size={15}/> Pasukti 90°</button><button className="secondary" onClick={rotateAll} disabled={!photos.length || busy}><Images size={15}/> Pasukti visas 90°</button></div><div className="orientation-control"><span>Kadravimo kryptis</span><div className="segmented"><button className={(selectedOrientation === 'vertical' || (selectedOrientation === 'auto' && active && getOrientation(active))) ? 'active' : ''} onClick={() => patchActive({ orientation: 'vertical' })}>Vertikalus</button><button className={(selectedOrientation === 'horizontal' || (selectedOrientation === 'auto' && active && !getOrientation(active))) ? 'active' : ''} onClick={() => patchActive({ orientation: 'horizontal' })}>Horizontalus</button></div></div><div className="footer-actions"><button className="secondary" onClick={reset} disabled={!active}><RotateCcw size={16}/> Atstatyti</button><button className="secondary" onClick={exportCurrent} disabled={!active}><Download size={16}/> Atsisiųsti šią nuotrauką</button></div></div></section>
     </main>
     {tab === 'quality' && <QualityTab photos={photos} thumbs={thumbSources} getPrint={getPhotoPrint} quality={quality} activeId={activeId} appMessage={message} onOpen={id => { setTab('crop'); if (id !== activeId) navigateTo(id); }} />}
     <section className={`filmstrip ${dropZone === 'strip' ? 'drag-over' : ''}`} style={tab === 'crop' ? undefined : { display: 'none' }}
