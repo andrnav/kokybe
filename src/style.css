@@ -226,3 +226,209 @@
 .cutline-switch.is-on .cutline-switch-track{background:#29966b}
 .cutline-switch.is-on .cutline-switch-track span{transform:translateX(12px)}
 @media(max-width:760px){.cutline-switch{margin-left:0}}
+
+
+/* v2.1.14 – šviesi žalios ir baltos spalvų tema */
+:root{
+  color-scheme:light;
+  font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:#17251f;
+  background:#f3f7f4;
+}
+html,body{background:#f3f7f4;color:#17251f}
+body{background:#f3f7f4}
+.app-shell{background:#f3f7f4;color:#17251f}
+.topbar{
+  background:#fff;border-bottom:1px solid #dce8df;
+  box-shadow:0 2px 12px rgba(25,65,43,.045);
+}
+.brand{color:#17251f}
+.brand-icon{background:#e4f4e9;color:#16834b}
+.tabs{gap:8px}
+.tab{color:#68786e}
+.tab.active{color:#147a45;border-color:#22975a;background:linear-gradient(180deg,#fff 0%,#edf8f0 100%)}
+.tab:hover:not(.active){color:#176b40;background:#f4faf5}
+.batch-count{color:#718077}
+.icon-button,.expand-button{
+  background:#fff;border-color:#d7e3da;color:#415348;
+  box-shadow:0 1px 2px rgba(22,55,36,.04)
+}
+.icon-button:hover,.expand-button:hover{background:#f0f8f2;border-color:#a9cdb4;color:#176b40}
+.download-button,.primary{
+  background:#16834b;border-color:#16834b;color:#fff;
+  box-shadow:0 4px 12px rgba(22,131,75,.16)
+}
+.download-button:hover,.primary:hover{background:#116c3d;border-color:#116c3d}
+.workspace{background:#f3f7f4}
+.left-panel,.right-panel,.editor-column{
+  background:#fff;border:1px solid #dce7df;
+  box-shadow:0 3px 14px rgba(26,63,42,.045)
+}
+.panel-title,.right-heading{color:#24382c}
+.format-option,.mode{
+  background:#f8fbf8;border-color:#dce7df;color:#24382c
+}
+.format-option:hover,.mode:hover{border-color:#9bc9a8;background:#f0f8f2}
+.format-option b{color:#23372a}
+.format-option small,.mode small{color:#718176}
+.format-option.selected,.mode.selected{
+  border-color:#22975a;background:#eaf7ee;
+  box-shadow:inset 0 0 0 1px #22975a
+}
+.mode svg{color:#328457}
+.section-divider{background:#e4ece6}
+.select-wrap select{
+  background:#fff;border-color:#d5e1d8;color:#26382c
+}
+.select-wrap svg{color:#718176}
+.side-note{color:#728176}
+.side-note svg{color:#22975a}
+.editor-toolbar{background:#fff;border-bottom-color:#e0e9e2}
+.photo-name{color:#304438}
+.toolbar-metrics{color:#65756a}
+.editor-nav button,.strip-tools button{
+  background:#f7faf7;border-color:#d9e4dc;color:#425449
+}
+.editor-nav button:hover,.strip-tools button:hover{
+  background:#edf7ef;border-color:#a9cdb3;color:#176b40
+}
+.editor-nav span{color:#718176}
+.expand-button{background:#f7faf7}
+.stage{
+  background:radial-gradient(ellipse at center,#35443b 0%,#202b25 62%,#141c17 100%);
+}
+.crop-frame{border-color:#f8fff9}
+.fit-frame,.real-frame{border-color:#f3fff5}
+.fit-frame span,.real-frame span{background:#101b14d9;color:#f4fff6}
+.stage-hint{background:#101b14c9;color:#e0eee3}
+.zoom-control{background:#17231beF;border-color:#52675a;color:#f0f8f1}
+.zoom-control button{color:#e1eee4}
+.empty-stage{color:#a9b9ad}
+.empty-stage b{color:#f0f8f1}
+.empty-stage span{color:#a9b9ad}
+.editor-footer{background:#fff;border-top-color:#e0e9e2}
+.orientation-control>span,.modal-side label{color:#68786d}
+.segmented{background:#f1f6f2;border-color:#d9e4dc}
+.segmented button{color:#68786d}
+.segmented button.active{
+  background:#dff2e5;color:#176b40;
+  box-shadow:inset 0 0 0 1px #8fc5a0
+}
+.secondary,.outline-wide{
+  background:#fff;border-color:#d5e1d8;color:#405247
+}
+.secondary:hover,.outline-wide:hover{background:#f0f8f2;border-color:#a9cdb3;color:#176b40}
+.summary-card{background:#f8fbf8;border-color:#dce7df}
+.summary-card>span,.summary-card small{color:#718176}
+.summary-card b{color:#26382c}
+.green{color:#16834b}
+.yellow{color:#a86b08}
+.muted{color:#7b887e}
+.upload-wide{background:#f5faf6;border-color:#d5e4d9;color:#31513c}
+.upload-wide:hover{background:#eaf6ed;border-color:#a6cdb1}
+.filmstrip{background:#fff;border-top-color:#dce7df}
+.strip-head b{color:#293b2f}
+.strip-head span,.thumb-label{color:#718176}
+.strip-tools button{background:#f8fbf8}
+.strip-arrow{background:#f6faf7;border-color:#dce7df;color:#506255}
+.thumb-image{background:#edf3ee}
+.thumb.active .thumb-image{border-color:#22975a;box-shadow:0 0 0 1px #22975a}
+.thumb-card.active{border-color:#8fc5a0;background:#f0f8f2}
+.thumb-select .thumb-label{color:#526457}
+.thumb-copies{border-top-color:#e0e9e2}
+.thumb-copies button{background:#fff;border-color:#d5e1d8;color:#405247}
+.thumb-copies button:hover{background:#eaf6ed;border-color:#9bc9a8}
+.thumb-copies b{color:#26382c}
+.legend span,.strip-count{color:#718176}
+.strip-message{color:#718176}
+.modal-backdrop{background:rgba(21,34,25,.58)}
+.modal-window{background:#fff;border-color:#d5e1d8;box-shadow:0 20px 80px rgba(15,35,22,.25)}
+.modal-top{border-bottom-color:#e0e9e2}
+.modal-top b{color:#26382c}
+.modal-top span{color:#718176}
+.modal-tools button{background:#f7faf7;border-color:#d9e4dc;color:#405247}
+.modal-tools button:hover{background:#edf7ef;border-color:#a9cdb3}
+.modal-tools .close-modal{background:transparent}
+.modal-side{background:#fff;border-left-color:#e0e9e2}
+.modal-side input{accent-color:#16834b}
+.modal-zoom{color:#526457}
+.free-resize-handle{background:#22975a}
+.stage.drag-over{outline-color:#70c18b;box-shadow:inset 0 0 0 9999px rgba(34,151,90,.12)}
+.filmstrip.drag-over{outline-color:#70c18b;background:#eff8f1}
+.thumb-copies .thumb-delete{border-color:#efc5c8;background:#fff3f3;color:#bd424b}
+.thumb-copies .thumb-delete:hover{background:#c94b54;color:#fff}
+
+/* Nuotraukų kokybės skiltis – šviesus, aiškiai skaitomas atvaizdavimas */
+.quality-page{background:#f3f7f4}
+.q-ctx{color:#68786e}
+.q-ctx b{color:#26382c}
+.q-only{color:#526457}
+.q-only input{accent-color:#16834b}
+.q-status{color:#68786e}
+.q-status.err{color:#c43d45}
+.q-summary{gap:9px}
+.q-sum{background:#fff;border-color:#dce7df;color:#526457}
+.q-sum b{color:#26382c}
+.q-sum.q-problem{border-color:#ead5a8;background:#fff8e8;color:#875b13}
+.q-badge.lv5{color:#126b3b;background:#def3e5}
+.q-badge.lv4{color:#426b20;background:#edf5df}
+.q-badge.lv3{color:#80630c;background:#fff5d6}
+.q-badge.lv2{color:#8b5910;background:#fff0d9}
+.q-badge.lv1{color:#a52f3a;background:#fde8e9}
+.q-badge.neutral{color:#65736a;background:#edf2ee}
+.q-ai,.q-box{background:#fff;border-color:#dce7df;box-shadow:0 3px 12px rgba(26,63,42,.035)}
+.q-ai p{color:#68786e}
+.q-ai .muted,.q-box .muted{color:#718176}
+.q-bar{background:#e8efe9}
+.q-bar i{background:#22975a}
+.q-empty{color:#718176}
+.q-row{background:#fff;border-color:#dce7df;box-shadow:0 2px 8px rgba(26,63,42,.025)}
+.q-row:hover{border-color:#9bc9a8}
+.q-row.current{border-color:#22975a;background:#f0f8f2}
+.q-thumb{background:#edf3ee}
+.q-name{color:#26382c}
+.q-sub{color:#718176}
+.q-why li{color:#5f7064}
+.q-why li.ok::before{color:#16834b}
+.q-why li.warn::before{color:#b77b16}
+.q-why li.bad::before{color:#c94b54}
+.q-adv{color:#344b3a}
+.q-adv.lv2,.q-adv.lv1{color:#98620d}
+.q-pending{color:#718176}
+.q-box summary{color:#26382c}
+.q-grid label{color:#526457}
+.q-grid input,.q-grid select{
+  background:#fff;border-color:#d5e1d8;color:#26382c
+}
+.q-grid input:focus,.q-grid select:focus,.select-wrap select:focus{
+  outline:2px solid rgba(34,151,90,.18);border-color:#22975a
+}
+.q-note,.q-footer-msg{color:#718176}
+.q-how{color:#526457}
+.q-how b{color:#26382c}
+.q-how a{color:#16834b}
+.q-ai-scores{background:#f4f8f5;border-color:#dce7df}
+.q-ai-scores>b{color:#26382c}
+.q-ai-score{background:#fff;border-color:#dce7df}
+.q-ai-score span{color:#718176}
+.q-ai-score strong{color:#344b3a}
+.real-dpi-picker{background:#f7faf7;border-color:#d9e4dc}
+.real-dpi-picker span{color:#718176}
+.real-dpi-picker button{color:#65756a}
+.real-dpi-picker button.active{background:#dff2e5;color:#176b40;box-shadow:inset 0 0 0 1px #8fc5a0}
+.cutline-switch.is-off{background:#fff0f1;border-color:#e8b8bd;color:#a83b46;box-shadow:none}
+.cutline-switch.is-on{background:#e1f5e8;border-color:#8fc5a0;color:#176b40;box-shadow:none}
+.cutline-switch-track{background:#cb7a82}
+.cutline-switch.is-on .cutline-switch-track{background:#22975a}
+
+/* Vienodas klaviatūros fokusas ir būsenų spalvos */
+button:focus-visible,[role="button"]:focus-visible,select:focus-visible,input:focus-visible{
+  outline:2px solid #22975a;outline-offset:2px
+}
+::selection{background:#ccebd5;color:#173b25}
+@media(max-width:760px){
+  .topbar{background:#fff}
+  .workspace{background:#f3f7f4}
+  .left-panel,.right-panel,.editor-column{border-radius:10px}
+  .filmstrip{background:#fff}
+}
