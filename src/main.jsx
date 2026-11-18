@@ -574,7 +574,11 @@ function App() {
     const pointerDown = e => {
       if (!active || e.target.closest('.zoom-control') || e.target.closest('.free-resize-handle')) return;
       e.preventDefault(); const lim = getMoveLimits();
-      setDragging(true); setDragStart({ x: e.clientX, y: e.clientY, pan: { ...pan }, ...lim });
+      const freeCropStart = selectedMode === 'free' ? getCrop(active) : null;
+      const freeTarget = freeCropStart ? getTargetRatio(active) : 1;
+      const freeSheetW = Math.min(stageW * 0.88, stageH * 0.82 * freeTarget);
+      const freeScale = freeCropStart ? freeSheetW / freeCropStart.sw : 1;
+      setDragging(true); setDragStart({ x: e.clientX, y: e.clientY, pan: { ...pan }, ...lim, freeCropStart, freeScale });
       e.currentTarget.setPointerCapture(e.pointerId);
     };
     const beginFreeResize = e => {
@@ -598,6 +602,27 @@ function App() {
         return;
       }
       if (!dragging || !dragStart || !active) return;
+      if (selectedMode === 'free' && dragStart.freeCropStart) {
+        const startCrop = dragStart.freeCropStart;
+        const dx = (e.clientX - dragStart.x) / dragStart.freeScale;
+        const dy = (e.clientY - dragStart.y) / dragStart.freeScale;
+        const currentBase = active.freeCrop || { x: 0, y: 0, w: active.width, h: active.height };
+        const insetX = (currentBase.w - startCrop.sw) / 2;
+        const insetY = (currentBase.h - startCrop.sh) / 2;
+        // A dragged crop can travel independently to either image edge.
+        const sx = clamp(startCrop.sx - dx, 0, active.width - startCrop.sw);
+        const sy = clamp(startCrop.sy - dy, 0, active.height - startCrop.sh);
+        patchActive({
+          freeCrop: {
+            x: sx - insetX,
+            y: sy - insetY,
+            w: currentBase.w,
+            h: currentBase.h
+          },
+          pan: { x: 0, y: 0 }
+        });
+        return;
+      }
       patchActive({ pan: { x: clamp(dragStart.pan.x + (e.clientX - dragStart.x) / dragStart.maxX, -1, 1), y: clamp(dragStart.pan.y + (e.clientY - dragStart.y) / dragStart.maxY, -1, 1) } });
     };
     return <div className={`stage ${dropZone === 'stage' ? 'drag-over' : ''}`} ref={stageRef}
