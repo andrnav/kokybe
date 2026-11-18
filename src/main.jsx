@@ -591,14 +591,14 @@ function App() {
       setDragging(true); setDragStart({ x: e.clientX, y: e.clientY, pan: { ...pan }, ...lim, freeCropStart, freeScale });
       e.currentTarget.setPointerCapture(e.pointerId);
     };
-    const beginFreeResize = e => {
+    const beginFreeResize = (e, corner) => {
       if (!active || selectedMode !== 'free') return;
       e.preventDefault(); e.stopPropagation();
       const crop = getCrop(active);
       const target = getTargetRatio(active);
       const sheetW = Math.min(stageW * 0.88, stageH * 0.82 * target);
       const scale = sheetW / crop.sw;
-      setResizeStart({ x: e.clientX, y: e.clientY, crop, scale });
+      setResizeStart({ x: e.clientX, y: e.clientY, crop, scale, corner });
       e.currentTarget.setPointerCapture(e.pointerId);
     };
     const pointerMove = e => {
@@ -606,9 +606,18 @@ function App() {
         const dx = (e.clientX - resizeStart.x) / resizeStart.scale;
         const dy = (e.clientY - resizeStart.y) / resizeStart.scale;
         const { crop } = resizeStart;
-        const w = clamp(crop.sw + dx, 40, active.width - crop.sx);
-        const h = clamp(crop.sh + dy, 40, active.height - crop.sy);
-        patchActive({ freeCrop: { x: crop.sx, y: crop.sy, w, h }, zoom: 1, pan: { x: 0, y: 0 } });
+        let nextCrop;
+        if (resizeStart.corner === 'top-left') {
+          const right = crop.sx + crop.sw, bottom = crop.sy + crop.sh;
+          const x = clamp(crop.sx + dx, 0, right - 40);
+          const y = clamp(crop.sy + dy, 0, bottom - 40);
+          nextCrop = { x, y, w: right - x, h: bottom - y };
+        } else {
+          const w = clamp(crop.sw + dx, 40, active.width - crop.sx);
+          const h = clamp(crop.sh + dy, 40, active.height - crop.sy);
+          nextCrop = { x: crop.sx, y: crop.sy, w, h };
+        }
+        patchActive({ freeCrop: nextCrop, zoom: 1, pan: { x: 0, y: 0 } });
         return;
       }
       if (!dragging || !dragStart || !active) return;
@@ -644,9 +653,9 @@ function App() {
       {active ? <>
         <div className={`print-sheet mode-${selectedMode}`} style={sheetStyle}>
           <img className="stage-photo" src={active.url} style={imageStyle} draggable="false" />
-          {selectedMode !== 'fit' && <div className="crop-shade" aria-hidden="true" />}{selectedMode === 'free' && <button className="free-resize-handle" aria-label="Keisti laisvo kadravimo dydį" onPointerDown={beginFreeResize} onClick={e => e.stopPropagation()} />}
+          {selectedMode !== 'fit' && <div className="crop-shade" aria-hidden="true" />}{selectedMode === 'free' && <><button className="free-resize-handle free-resize-handle-tl" aria-label="Keisti laisvo kadro viršutinį kairį kampą" onPointerDown={e => beginFreeResize(e, 'top-left')} onClick={e => e.stopPropagation()} /><button className="free-resize-handle free-resize-handle-br" aria-label="Keisti laisvo kadro apatinį dešinį kampą" onPointerDown={e => beginFreeResize(e, 'bottom-right')} onClick={e => e.stopPropagation()} /></>}
         </div>
-        <div className="stage-hint"><Move size={14}/> {selectedMode === 'fit' ? 'Vilkite nuotrauką ir priartinkite, kad sumažintumėte baltus kraštus' : selectedMode === 'free' ? 'Vilkite nuotrauką pozicijai keisti, tempkite apatinį dešinį kampą kadrui keisti' : 'Vilkite nuotrauką norėdami pakeisti jos poziciją'}</div>
+        <div className="stage-hint"><Move size={14}/> {selectedMode === 'fit' ? 'Vilkite nuotrauką ir priartinkite, kad sumažintumėte baltus kraštus' : selectedMode === 'free' ? 'Vilkite nuotrauką pozicijai keisti, tempkite mėlynus kampų taškus kadrui keisti' : 'Vilkite nuotrauką norėdami pakeisti jos poziciją'}</div>
         <div className="zoom-control"><button onClick={e => { e.stopPropagation(); setZoomValue(zoom - .1); }}><ZoomOut size={17}/></button><span>{Math.round(zoom * 100)}%</span><button onClick={e => { e.stopPropagation(); setZoomValue(zoom + .1); }}><ZoomIn size={17}/></button></div>
       </> : <div className="empty-stage"><Images size={48}/><b>Įkelkite nuotraukas</b><span>Pasirinkite vieną ar daugiau JPG, PNG, HEIC arba TIFF failų</span><button className="primary" onClick={() => fileRef.current?.click()}><ImagePlus size={17}/> Įkelti nuotraukas</button></div>}
     </div>;

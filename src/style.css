@@ -123,7 +123,7 @@
 .print-sheet.mode-free:active{cursor:grabbing}
 .print-sheet.mode-free .stage-photo{z-index:1}
 .print-sheet.mode-free .crop-shade{z-index:2}
-.free-resize-handle{position:absolute;z-index:6;right:-8px;bottom:-8px;width:17px;height:17px;border:2px solid #fff;border-radius:50%;background:#318cff;box-shadow:0 1px 8px #0009;cursor:nwse-resize;touch-action:none;padding:0}
+.free-resize-handle{position:absolute;z-index:6;width:17px;height:17px;border:2px solid #fff;border-radius:50%;background:#318cff;box-shadow:0 1px 8px #0009;touch-action:none;padding:0}.free-resize-handle-br{right:-8px;bottom:-8px;cursor:nwse-resize}.free-resize-handle-tl{left:-8px;top:-8px;cursor:nwse-resize}
 @media(max-width:1100px){.thumb-card{flex-basis:150px;width:150px}.toolbar-metrics{gap:6px}}
 @media(max-width:760px){
   .editor-toolbar{height:auto;min-height:54px;flex-wrap:wrap;padding:8px}
