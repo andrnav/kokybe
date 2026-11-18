@@ -1,7 +1,7 @@
 {
   "name": "foto-inspektorius",
   "private": true,
-  "version": "2.7.13",
+  "version": "2.7.14",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",

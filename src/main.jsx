@@ -269,6 +269,7 @@ function App() {
   const [format, setFormat] = useState('10x15');
   const [customCm, setCustomCm] = useState([10, 15]);
   const [customCmDraft, setCustomCmDraft] = useState(['10', '15']);
+  const customCmTimers = useRef([]);
   const [mode, setMode] = useState('free');
   const [exportFormat, setExportFormat] = useState('jpg');
   const [zoom, setZoom] = useState(1);
@@ -294,7 +295,7 @@ function App() {
   useEffect(() => {
     if (active) { setZoom(active.zoom ?? 1); setPan(active.pan || { x: 0, y: 0 }); setMode(active.mode || 'crop'); setFormat(active.format || format); setCustomCm(active.customCm || customCm); setCustomCmDraft((active.customCm || customCm).map(String)); }
   }, [activeId]);
-  useEffect(() => () => photos.forEach(p => URL.revokeObjectURL(p.url)), []);
+  useEffect(() => () => { customCmTimers.current.forEach(timer => timer && clearTimeout(timer)); photos.forEach(p => URL.revokeObjectURL(p.url)); }, []);
   useEffect(() => { localStorage.setItem('foto-inspektorius-quality-scale', JSON.stringify(qualityScale)); }, [qualityScale]);
   useEffect(() => {
     const node = stageRef.current;
@@ -416,6 +417,14 @@ function App() {
   const changeCustom = (index, raw) => {
     // Kol vartotojas rašo, leidžiame laukeliui būti tuščiam.
     setCustomCmDraft(prev => prev.map((value, i) => i === index ? raw : value));
+    if (customCmTimers.current[index]) clearTimeout(customCmTimers.current[index]);
+    // Tuščias ar tarpinis įrašas nepatvirtinamas. Galima ramiai ištrinti ir įrašyti iš naujo.
+    const normalized = String(raw).trim().replace(',', '.');
+    if (!normalized || normalized === '.' || !Number.isFinite(Number(normalized))) return;
+    customCmTimers.current[index] = setTimeout(() => {
+      commitCustom(index, raw);
+      customCmTimers.current[index] = null;
+    }, 600);
   };
   const commitCustom = (index, inputValue) => {
     // Naudojame tiesioginę laukelio reikšmę, kad blur metu nepasigautume pasenusios React state reikšmės.
@@ -649,7 +658,7 @@ function App() {
     <main className="workspace" style={tab === 'crop' ? undefined : { display: 'none' }}>
       <aside className="left-panel"><div className="panel-title">1. Kadravimo tipas</div><div className="mode-list"><button className={selectedMode === 'free' ? 'mode selected' : 'mode'} onClick={() => { setMode('free'); if (active) patchActive({ mode: 'free', zoom: 1, pan: { x: 0, y: 0 }, freeCrop: { x: 0, y: 0, w: active.width, h: active.height } }); }}><Crop/><span>Laisvas tipas</span></button><button className={selectedMode === 'crop' ? 'mode selected' : 'mode'} onClick={() => { setMode('crop'); if (active) patchActive({ mode: 'crop' }); }}><Crop/><span>Kadruoti</span></button><button className={selectedMode === 'fit' ? 'mode selected' : 'mode'} onClick={() => { setMode('fit'); if (active) patchActive({ mode: 'fit' }); }}><Square/><span>Įtalpinta</span></button><button className={selectedMode === 'real' ? 'mode selected' : 'mode'} onClick={() => { setMode('real'); if (active) patchActive({ mode: 'real' }); }}><Ruler/><span>Real Size<small>320 DPI</small></span></button></div>
         <div className="section-divider"/><div className="panel-title">2. Spausdinimo formatas</div><div className="select-wrap format-select"><select value={currentFormatId} disabled={selectedMode === 'free'} onChange={e => changeFormat(e.target.value)}>{FORMATS.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}<option value="custom">Pagal skaičius</option></select></div>
-        <div className="custom-format"><div className="custom-format-title">Formato matmuo</div><div className="custom-format-fields"><input disabled={selectedMode === "free"} aria-label="Pirmas matmuo centimetrais" type="text" inputMode="decimal" value={customCmDraft[0]} onFocus={() => setCustomCmDraft(prev => prev.map((v, i) => i === 0 ? String(customCm[0]) : v))} onChange={e => changeCustom(0, e.target.value)} onBlur={e => commitCustom(0, e.currentTarget.value)} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}/><span>×</span><input disabled={selectedMode === "free"} aria-label="Antras matmuo centimetrais" type="text" inputMode="decimal" value={customCmDraft[1]} onFocus={() => setCustomCmDraft(prev => prev.map((v, i) => i === 1 ? String(customCm[1]) : v))} onChange={e => changeCustom(1, e.target.value)} onBlur={e => commitCustom(1, e.currentTarget.value)} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}/></div></div>
+        <div className="custom-format"><div className="custom-format-title">Formato matmuo</div><div className="custom-format-fields"><input disabled={selectedMode === "free"} aria-label="Pirmas matmuo centimetrais" type="text" inputMode="decimal" value={customCmDraft[0]} onFocus={() => setCustomCmDraft(prev => prev.map((v, i) => i === 0 ? String(customCm[0]) : v))} onChange={e => changeCustom(0, e.target.value)} onBlur={e => { if (customCmTimers.current[0]) clearTimeout(customCmTimers.current[0]); customCmTimers.current[0] = null; commitCustom(0, e.currentTarget.value); }} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}/><span>×</span><input disabled={selectedMode === "free"} aria-label="Antras matmuo centimetrais" type="text" inputMode="decimal" value={customCmDraft[1]} onFocus={() => setCustomCmDraft(prev => prev.map((v, i) => i === 1 ? String(customCm[1]) : v))} onChange={e => changeCustom(1, e.target.value)} onBlur={e => { if (customCmTimers.current[1]) clearTimeout(customCmTimers.current[1]); customCmTimers.current[1] = null; commitCustom(1, e.currentTarget.value); }} onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}/></div></div>
         <button className="apply-all-button" onClick={() => applyModeToAll(selectedMode)} disabled={!photos.length}>Taikyti visoms nuotraukoms</button>
         <div className="section-divider"/><div className="panel-title">3. Eksportas</div><div className="select-wrap"><select value={exportFormat} onChange={e => setExportFormat(e.target.value)}><option value="jpg">JPG</option><option value="tif">TIFF · 8 bitų · Lossless</option></select></div></aside>
       <section className="editor-column"><div className="editor-toolbar"><div className="photo-title-group"><div className="photo-name">{active?.name || 'Nuotrauka nepasirinkta'}</div><div className="image-metrics toolbar-metrics">{metrics && <><span><b>{metrics.widthPx.toLocaleString('lt-LT')} × {metrics.heightPx.toLocaleString('lt-LT')} px</b></span><span>{metrics.size}</span><span><b>{metrics.dpi}</b></span><span className={`quality-indicator ${metrics.qualityClass}`} title={metrics.targetDpi ? `Tikslas: ${metrics.targetDpi} DPI` : 'Laisvam formatui kokybė pagal spaudos dydį neskaičiuojama'}>Kokybė: <b>{metrics.quality}</b></span></>}</div></div><div className="editor-nav"><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i > 0) navigateTo(photos[i - 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === 0}><ChevronLeft size={17}/> Ankstesnė</button><span>{active ? `${photos.findIndex(p => p.id === activeId) + 1} iš ${photos.length}` : '0 iš 0'}</span><button onClick={() => { const i = photos.findIndex(p => p.id === activeId); if (i < photos.length - 1) navigateTo(photos[i + 1].id); }} disabled={!active || photos.findIndex(p => p.id === activeId) === photos.length - 1}>Kita <ChevronRight size={17}/></button></div></div>
